@@ -1,4 +1,4 @@
-type Float = f32;
+use crate::Float;
 
 fn random() -> Float {
     1.
@@ -98,9 +98,36 @@ impl Layer {
     }
 }
 
-struct Step {
+pub struct Step {
     weights: Vec<Vec<Vec<Float>>>,
     biases: Vec<Vec<Float>>,
+}
+
+impl Step {
+    pub fn add(steps: Vec<Step>) -> Step {
+        assert!(steps.len() > 0);
+
+        let steps_len = steps.len() as Float;
+
+        let mut ret = Step {
+            weights: vec![],
+            biases: vec![],
+        };
+
+        for step in steps {
+            for layer_i in 0..step.weights.len() {
+                for neuron_i in 0..step.weights[layer_i].len() {
+                    for input_neuron_i in 0..step.weights[layer_i][neuron_i].len() {
+                        ret.weights[layer_i][neuron_i][input_neuron_i] +=
+                            step.weights[layer_i][neuron_i][input_neuron_i] / steps_len;
+                    }
+                    ret.biases[layer_i][neuron_i] += step.biases[layer_i][neuron_i] / steps_len;
+                }
+            }
+        }
+
+        ret
+    }
 }
 
 pub struct Perceptron {
@@ -180,5 +207,18 @@ impl Perceptron {
         }
 
         ret
+    }
+
+    pub fn apply(&mut self, step: Step){
+            for layer_i in 0..ret.weights.len() {
+                for neuron_i in 0..ret.weights[layer_i].len() {
+                    for input_neuron_i in 0..ret.weights[layer_i][neuron_i].len() {
+                        ret.weights[layer_i][neuron_i][input_neuron_i] +=
+                            step.weights[layer_i][neuron_i][input_neuron_i];
+                    }
+                    ret.biases[layer_i][neuron_i] += step.biases[layer_i][neuron_i];
+                }
+            }
+        
     }
 }
