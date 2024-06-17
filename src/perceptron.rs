@@ -4,9 +4,9 @@ fn random() -> Float {
     1.
 }
 
+#[derive(Debug)]
 struct Layer {
     neuron_count: usize,
-    previous_layer_neuron_count: usize,
     weights: Vec<Vec<Float>>,
     biases: Vec<Float>,
 }
@@ -16,9 +16,11 @@ struct BackPropStep {
     weights_step: Vec<Vec<Float>>,
     biases_step: Vec<Float>,
 }
-struct LayerState {
-    activations: Vec<Float>,
-    stimulations: Vec<Float>,
+
+#[derive(Debug)]
+pub struct LayerState {
+    pub activations: Vec<Float>,
+    pub stimulations: Vec<Float>,
 }
 impl Layer {
     fn new(neuron_count: usize, previous_layer_neuron_count: usize) -> Self {
@@ -29,21 +31,24 @@ impl Layer {
 
         Layer {
             neuron_count,
-            previous_layer_neuron_count,
             weights,
             biases,
         }
     }
 
     fn activation_fn(&self, input: &Float) -> Float {
-        input.max(0.)
+        if *input > 0. {
+            *input
+        } else {
+            input * 0.1
+        }
     }
 
     fn activation_fn_d(&self, input: &Float) -> Float {
         if *input > 0. {
             1.
         } else {
-            0.
+            0.1
         }
     }
 
@@ -89,7 +94,7 @@ impl Layer {
                     * self.activation_fn_d(&current_layer_state.stimulations[i])
                     * previous_activation[j];
 
-                ret.prev_layer_activation_gradient[i] +=
+                ret.prev_layer_activation_gradient[j] +=
                     gradient * self.activation_fn_d(&current_layer_state.stimulations[i]) * weight;
             }
         }
@@ -104,15 +109,12 @@ pub struct Step {
 }
 
 impl Step {
-    pub fn add(steps: Vec<Step>) -> Step {
+    pub fn add(steps: Vec<Step>, empty_step: Step) -> Step {
         assert!(steps.len() > 0);
 
         let steps_len = steps.len() as Float;
 
-        let mut ret = Step {
-            weights: vec![],
-            biases: vec![],
-        };
+        let mut ret: Step = empty_step;
 
         for step in steps {
             for layer_i in 0..step.weights.len() {
@@ -130,6 +132,7 @@ impl Step {
     }
 }
 
+#[derive(Debug)]
 pub struct Perceptron {
     input_size: usize,
     layers: Vec<Layer>,
@@ -158,20 +161,36 @@ impl Perceptron {
     pub fn predict(&self, input: &Vec<Float>) -> Vec<LayerState> {
         let mut ret = vec![];
 
-        ret[0] = self.layers[0].activation(input);
+        ret.push(self.layers[0].activation(input));
 
         for i in 1..self.layers.len() {
-            ret[i] = self.layers[i].activation(&ret[i - 1].activations);
+            ret.push(self.layers[i].activation(&ret[i - 1].activations));
+        }
+
+        ret
+    }
+
+    pub fn get_empty_step(&self) -> Step {
+        let mut ret = Step {
+            weights: vec![],
+            biases: vec![],
+        };
+
+        for layer in &self.layers {
+            let mut weights = vec![];
+            for output_neuron in &layer.weights {
+                weights.push(vec![0.; output_neuron.len()])
+            }
+
+            ret.weights.push(weights);
+            ret.biases.push(vec![0.; layer.biases.len()])
         }
 
         ret
     }
 
     pub fn back_propagation(&self, input: &Vec<Float>, output: &Vec<Float>) -> Step {
-        let mut ret = Step {
-            weights: vec![],
-            biases: vec![],
-        };
+        let mut ret = self.get_empty_step();
 
         let layer_states = self.predict(&input);
         let mut activation_gradients: Vec<Vec<Float>> = vec![];
@@ -201,7 +220,7 @@ impl Perceptron {
                 &activation_gradient,
             );
 
-            activation_gradients[i] = backprop_step.prev_layer_activation_gradient;
+            activation_gradients.push(backprop_step.prev_layer_activation_gradient);
             ret.weights[layer_i] = backprop_step.weights_step;
             ret.biases[layer_i] = backprop_step.biases_step;
         }
@@ -209,16 +228,15 @@ impl Perceptron {
         ret
     }
 
-    pub fn apply(&mut self, step: Step){
-            for layer_i in 0..ret.weights.len() {
-                for neuron_i in 0..ret.weights[layer_i].len() {
-                    for input_neuron_i in 0..ret.weights[layer_i][neuron_i].len() {
-                        ret.weights[layer_i][neuron_i][input_neuron_i] +=
-                            step.weights[layer_i][neuron_i][input_neuron_i];
-                    }
-                    ret.biases[layer_i][neuron_i] += step.biases[layer_i][neuron_i];
+    pub fn apply(&mut self, step: Step) {
+        for layer_i in 0..step.weights.len() {
+            for neuron_i in 0..step.weights[layer_i].len() {
+                for input_neuron_i in 0..step.weights[layer_i][neuron_i].len() {
+                    self.layers[layer_i].weights[neuron_i][input_neuron_i] +=
+                        step.weights[layer_i][neuron_i][input_neuron_i];
                 }
+                self.layers[layer_i].biases[neuron_i] += step.biases[layer_i][neuron_i];
             }
-        
+        }
     }
 }
