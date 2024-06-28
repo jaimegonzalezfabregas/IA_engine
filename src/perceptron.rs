@@ -1,4 +1,4 @@
-use crate::Float;
+use crate::{DataPoint, Float};
 
 fn random() -> Float {
     1.
@@ -11,6 +11,7 @@ struct Layer {
     biases: Vec<Float>,
 }
 
+#[derive(Debug)]
 struct BackPropStep {
     prev_layer_activation_gradient: Vec<Float>,
     weights_step: Vec<Vec<Float>>,
@@ -103,6 +104,7 @@ impl Layer {
     }
 }
 
+#[derive(Debug)]
 pub struct Step {
     weights: Vec<Vec<Vec<Float>>>,
     biases: Vec<Vec<Float>>,
@@ -193,6 +195,7 @@ impl Perceptron {
         let mut ret = self.get_empty_step();
 
         let layer_states = self.predict(&input);
+
         let mut activation_gradients: Vec<Vec<Float>> = vec![];
 
         for i in 0..layer_states.len() {
@@ -228,15 +231,70 @@ impl Perceptron {
         ret
     }
 
-    pub fn apply(&mut self, step: Step) {
+    pub fn apply(&mut self, step: Step, learning_factor: f32) {
         for layer_i in 0..step.weights.len() {
             for neuron_i in 0..step.weights[layer_i].len() {
                 for input_neuron_i in 0..step.weights[layer_i][neuron_i].len() {
                     self.layers[layer_i].weights[neuron_i][input_neuron_i] +=
-                        step.weights[layer_i][neuron_i][input_neuron_i];
+                        step.weights[layer_i][neuron_i][input_neuron_i] * learning_factor;
                 }
-                self.layers[layer_i].biases[neuron_i] += step.biases[layer_i][neuron_i];
+                self.layers[layer_i].biases[neuron_i] +=
+                    step.biases[layer_i][neuron_i] * learning_factor;
             }
         }
+    }
+
+    pub fn train<const VERBOSE: bool>(&mut self, dataset: &Vec<DataPoint>, epochs: usize, learning_factor: f32) {
+        let mut running_cost = 0.;
+        let mut running_cost_lenght = 0;
+
+        for _ in 0..epochs {
+            let steps = dataset
+                .iter()
+                .map(|c| self.back_propagation(&c.input, &c.output))
+                .collect();
+
+            let step = Step::add(steps, self.get_empty_step());
+
+            self.apply(step, learning_factor);
+
+            let new_cost = self.verify::<false>(dataset);
+
+            if VERBOSE {
+                println!("{new_cost}");
+            }
+
+            if (new_cost - running_cost).abs() > 0.00001 {
+                running_cost = new_cost;
+                running_cost_lenght = 0;
+            } else {
+                running_cost_lenght += 1;
+                if running_cost_lenght > 1000 {
+                    return;
+                }
+            }
+        }
+    }
+
+    pub fn verify<const VERBOSE: bool>(&self, dataset: &Vec<DataPoint>) -> f32 {
+        dataset.iter().fold(0., |cost_acc, case| {
+            let prediction = self.predict(&case.input);
+            let predicted_output = prediction.last().expect("verify");
+
+            
+
+            let case_cost = predicted_output.activations.iter().zip(&case.output).fold(
+                0.,
+                |cost, (predicted_neuron, desired_neuron)| {
+                    cost + (predicted_neuron - desired_neuron) * (predicted_neuron - desired_neuron)
+                },
+            );
+
+            if VERBOSE {
+                println!("for input {:?} the output was {:?} while expecting {:?}, wich equates to a cost of {}", case.input, predicted_output, case.output, case_cost)
+            }
+
+            cost_acc + case_cost
+        })
     }
 }
