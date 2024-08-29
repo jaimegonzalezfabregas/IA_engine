@@ -1,11 +1,12 @@
 mod polinomial;
+mod piston_backend;
 
-use full_palette::{GREEN_A700};
+use full_palette::GREEN_A700;
+use ia_engine::trainer::{DataPoint, Trainer};
 use piston_backend::draw_piston_window;
 use piston_window::{PistonWindow, WindowSettings};
 use plotters::prelude::*;
 use polinomial::Polinomial;
-use trainer::{DataPoint, Trainer};
 
 fn polinomial(x: f32) -> f32 {
     1. * (x * x * x * x * x) - 4. * (x * x * x * x) - 10. * (x * x * x)
@@ -101,7 +102,7 @@ fn main() {
 }
 
 fn dataset_service<const P: usize>(epoch: isize) -> Vec<DataPoint<P, 1, 1>> {
-    let abs_max = 1 + epoch;
+    let abs_max = SPEED * 5;
     (-abs_max..abs_max)
         .map(|x| x as f32 / SPEED as f32)
         // .map(|x| x as f32 / 10.)

@@ -30,7 +30,7 @@ impl<const P: usize> Dual<P> {
         ret
     }
 
-    pub(crate) fn new(real: f32) -> Self {
+    pub fn new(real: f32) -> Self {
         let mut ret = Self::cero();
         ret.real = real;
         ret

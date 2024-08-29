@@ -1,8 +1,7 @@
 use std::array;
 
+use ia_engine::{dual::Dual, trainer::Trainable};
 use rand::Rng;
-
-use crate::{dual::Dual, trainer::Trainable};
 
 #[derive(Debug)]
 pub struct Polinomial<const G: usize> {
