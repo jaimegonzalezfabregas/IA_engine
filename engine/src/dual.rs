@@ -109,18 +109,18 @@ impl<const P: usize> MulAssign<&Dual<P>> for Dual<P> {
     }
 }
 
-impl<const P: usize> Div for &Dual<P> {
+impl<const P: usize> Div<&Dual<P>> for Dual<P> {
     type Output = Dual<P>;
 
     fn div(self, rhs: &Dual<P>) -> Self::Output {
         let rhs_real_to_2 = rhs.real * rhs.real;
 
         let mut ret = Dual {
-            real: self.real * rhs.real,
+            real: self.real / rhs.real,
             sigma: [0.; P],
         };
         for i in 0..P {
-            ret.sigma[i] = self.sigma[i] * self.real - self.real * rhs.sigma[i] / rhs_real_to_2
+            ret.sigma[i] = (self.sigma[i] * rhs.real - self.real * rhs.sigma[i]) / rhs_real_to_2
         }
 
         ret
@@ -129,7 +129,7 @@ impl<const P: usize> Div for &Dual<P> {
 
 impl<const P: usize> DivAssign<&Dual<P>> for Dual<P> {
     fn div_assign(&mut self, rhs: &Dual<P>) {
-        *self = &*self / rhs;
+        *self = *self / rhs;
     }
 }
 
