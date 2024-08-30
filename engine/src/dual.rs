@@ -7,6 +7,12 @@ pub struct Dual<const P: usize> {
     sigma: [f32; P],
 }
 
+impl<const P: usize> From<f32> for Dual<P> {
+    fn from(value: f32) -> Self {
+        Self::new(value)
+    }
+}
+
 impl<const P: usize> Dual<P> {
     pub fn cero() -> Self {
         Self {
@@ -37,16 +43,10 @@ impl<const P: usize> Dual<P> {
     }
 }
 
-impl<const P: usize> Default for Dual<P> {
-    fn default() -> Self {
-        Self::cero()
-    }
-}
-
-impl<const P: usize> Add<&Dual<P>> for Dual<P> {
+impl<const P: usize> Add<Dual<P>> for Dual<P> {
     type Output = Dual<P>;
 
-    fn add(self, rhs: &Dual<P>) -> Self::Output {
+    fn add(self, rhs: Dual<P>) -> Self::Output {
         let mut ret = Dual {
             real: self.real + rhs.real,
             sigma: [0.; P],
@@ -59,16 +59,27 @@ impl<const P: usize> Add<&Dual<P>> for Dual<P> {
     }
 }
 
-impl<const P: usize> AddAssign<&Dual<P>> for Dual<P> {
-    fn add_assign(&mut self, rhs: &Dual<P>) {
+impl<const P: usize, N: Into<f32>> Add<N> for Dual<P> {
+    type Output = Dual<P>;
+
+    fn add(self, rhs: N) -> Self::Output {
+        Dual {
+            real: self.real + rhs.into(),
+            sigma: self.sigma,
+        }
+    }
+}
+
+impl<const P: usize> AddAssign<Dual<P>> for Dual<P> {
+    fn add_assign(&mut self, rhs: Dual<P>) {
         *self = *self + rhs;
     }
 }
 
-impl<const P: usize> Sub<&Dual<P>> for Dual<P> {
+impl<const P: usize> Sub<Dual<P>> for Dual<P> {
     type Output = Dual<P>;
 
-    fn sub(self, rhs: &Dual<P>) -> Self::Output {
+    fn sub(self, rhs: Dual<P>) -> Self::Output {
         let mut ret = Dual {
             real: self.real - rhs.real,
             sigma: [0.; P],
@@ -81,16 +92,27 @@ impl<const P: usize> Sub<&Dual<P>> for Dual<P> {
     }
 }
 
-impl<const P: usize> SubAssign<&Dual<P>> for Dual<P> {
-    fn sub_assign(&mut self, rhs: &Dual<P>) {
+impl<const P: usize, N: Into<f32>> Sub<N> for Dual<P> {
+    type Output = Dual<P>;
+
+    fn sub(self, rhs: N) -> Self::Output {
+        Dual {
+            real: self.real - rhs.into(),
+            sigma: self.sigma,
+        }
+    }
+}
+
+impl<const P: usize> SubAssign<Dual<P>> for Dual<P> {
+    fn sub_assign(&mut self, rhs: Dual<P>) {
         *self = *self - rhs;
     }
 }
 
-impl<const P: usize> Mul<&Dual<P>> for Dual<P> {
+impl<const P: usize> Mul<Dual<P>> for Dual<P> {
     type Output = Dual<P>;
 
-    fn mul(self, rhs: &Dual<P>) -> Self::Output {
+    fn mul(self, rhs: Dual<P>) -> Self::Output {
         let mut ret = Dual {
             real: self.real * rhs.real,
             sigma: [0.; P],
@@ -103,16 +125,33 @@ impl<const P: usize> Mul<&Dual<P>> for Dual<P> {
     }
 }
 
-impl<const P: usize> MulAssign<&Dual<P>> for Dual<P> {
-    fn mul_assign(&mut self, rhs: &Dual<P>) {
+impl<const P: usize, N: Into<f32> + Copy> Mul<N> for Dual<P> {
+    type Output = Dual<P>;
+
+    fn mul(self, rhs: N) -> Self::Output {
+        let mut ret = Dual {
+            real: self.real * rhs.into(),
+            sigma: [0.; P],
+        }; 
+
+        for i in 0..P {
+            ret.sigma[i] = self.sigma[i] * rhs.into()
+        }
+
+        ret
+    }
+}
+
+impl<const P: usize> MulAssign<Dual<P>> for Dual<P> {
+    fn mul_assign(&mut self, rhs: Dual<P>) {
         *self = *self * rhs;
     }
 }
 
-impl<const P: usize> Div<&Dual<P>> for Dual<P> {
+impl<const P: usize> Div<Dual<P>> for Dual<P> {
     type Output = Dual<P>;
 
-    fn div(self, rhs: &Dual<P>) -> Self::Output {
+    fn div(self, rhs: Dual<P>) -> Self::Output {
         let rhs_real_to_2 = rhs.real * rhs.real;
 
         let mut ret = Dual {
@@ -127,8 +166,27 @@ impl<const P: usize> Div<&Dual<P>> for Dual<P> {
     }
 }
 
-impl<const P: usize> DivAssign<&Dual<P>> for Dual<P> {
-    fn div_assign(&mut self, rhs: &Dual<P>) {
+impl<const P: usize, N: Into<f32>> Div<N> for Dual<P> {
+    type Output = Dual<P>;
+
+     fn div(self, rhs: N) -> Self::Output {
+        let rhs_real = rhs.into();
+        let rhs_real_to_2 = rhs_real * rhs_real;
+
+        let mut ret = Dual {
+            real: self.real / rhs_real,
+            sigma: [0.; P],
+        };
+        for i in 0..P {
+            ret.sigma[i] = (self.sigma[i] * rhs_real) / rhs_real_to_2
+        }
+
+        ret
+    }
+}
+
+impl<const P: usize> DivAssign<Dual<P>> for Dual<P> {
+    fn div_assign(&mut self, rhs: Dual<P>) {
         *self = *self / rhs;
     }
 }
@@ -137,7 +195,7 @@ impl<const P: usize> Neg for Dual<P> {
     type Output = Dual<P>;
 
     fn neg(self) -> Self::Output {
-        self * &Dual {
+        self * Dual {
             real: -1.,
             sigma: [0.; P],
         }

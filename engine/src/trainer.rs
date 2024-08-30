@@ -1,5 +1,7 @@
 use std::array;
 
+use rand::Rng;
+
 use crate::dual::Dual;
 
 #[derive(Debug)]
@@ -13,65 +15,70 @@ impl<const P: usize, const I: usize, const O: usize> DataPoint<P, I, O> {
         let mut ret = Dual::cero();
 
         for (pred_val, goal_val) in prediction.iter().zip(self.output.iter()) {
-            let diff = *pred_val - &Dual::new(*goal_val);
-            let diff_sqr = diff * &diff;
-            ret += &diff_sqr;
+            let diff = *pred_val - Dual::new(*goal_val);
+            let diff_sqr = diff * diff;
+            ret += diff_sqr;
         }
 
         ret
     }
 }
 
-pub trait Trainable<const P: usize, const I: usize, const O: usize> {
-    fn get_params(&self) -> [f32; P];
-    fn set_params(&mut self, params: [f32; P]);
-    fn eval(&self, input: &[Dual<P>; I]) -> [Dual<P>; O];
-    fn cost(&self, dataset: &Vec<DataPoint<P, I, O>>) -> Dual<P> {
-        let mut cost = Dual::cero();
-
-        for data_point in dataset.iter() {
-            let prediction = self.eval(&data_point.input.map(|e| Dual::new(e)));
-            let case_cost = data_point.cost(prediction);
-
-            cost += &case_cost;
-        }
-
-        cost / &Dual::<P>::new(dataset.len() as f32)
-    }
-}
-
-pub struct Trainer<const P: usize, const I: usize, const O: usize, T: Trainable<P, I, O>> {
-    model: T,
+pub struct Trainer<
+    const P: usize,
+    const I: usize,
+    const O: usize,
+    F: Fn(&[Dual<P>; P], &[Dual<P>; I]) -> [Dual<P>; O],
+> {
+    model: F,
+    params: [Dual<P>; P],
     last_cost: Option<Dual<P>>,
     learning_factor: f32,
 }
 
-impl<const P: usize, const I: usize, const O: usize, T: Trainable<P, I, O>> Trainer<P, I, O, T> {
-    pub fn get_model_params(&self) -> [f32;P]{
-        self.model.get_params()
+impl<
+        const P: usize,
+        const I: usize,
+        const O: usize,
+        F: Fn(&[Dual<P>; P], &[Dual<P>; I]) -> [Dual<P>; O],
+    > Trainer<P, I, O, F>
+{
+    pub fn get_model_params(&self) -> [f32; P] {
+        self.params.map(|e| e.get_real())
     }
-    
-    pub fn new(trainable: T) -> Self {
+
+    fn cost(&self, dataset: &Vec<DataPoint<P, I, O>>) -> Dual<P> {
+        let mut cost = Dual::cero();
+
+        for data_point in dataset.iter() {
+            let prediction = (self.model)(&self.params, &data_point.input.map(|e| Dual::new(e)));
+            let case_cost = data_point.cost(prediction);
+
+            cost += case_cost;
+        }
+
+        cost / dataset.len() as u16
+    }
+
+    pub fn new(trainable: F) -> Self {
+        let mut rng = rand::thread_rng();
         Self {
             model: trainable,
+            params: array::from_fn(|i| Dual::new_param(rng.gen(), i)),
             last_cost: None,
             learning_factor: 1.,
         }
     }
 
-    pub fn eval(&self, input: [f32; I]) -> [f32; O]{
-        self.model.eval(&array::from_fn(|i| Dual::new(input[i]))).map(|e|e.get_real())
-    }
-
     pub fn train_step(&mut self, dataset: &Vec<DataPoint<P, I, O>>) -> bool {
         let cost = match self.last_cost {
-            None => self.model.cost(dataset),
+            None => self.cost(dataset),
             Some(c) => c,
         };
         self.last_cost = Some(cost);
 
         let unit_gradient = self.last_cost.unwrap().get_gradient();
-        let og_parameters = self.model.get_params();
+        let og_parameters = self.params.map(|e| e.get_real());
 
         let cost_to_beat = cost.get_real();
         // println!("cost to beat: {cost_to_beat}");
@@ -79,10 +86,10 @@ impl<const P: usize, const I: usize, const O: usize, T: Trainable<P, I, O>> Trai
         let mut learning_factor = self.learning_factor;
 
         while self.last_cost.unwrap().get_real() >= cost_to_beat {
-            self.model.set_params(array::from_fn(|i| {
-                og_parameters[i] - unit_gradient[i] * learning_factor
-            }));
-            self.last_cost = Some(self.model.cost(dataset));
+            self.params = array::from_fn(|i| {
+                Dual::new_param(og_parameters[i] - unit_gradient[i] * learning_factor, i)
+            });
+            self.last_cost = Some(self.cost(dataset));
             // println!(
             //     "    improvement: {learning_factor} {}",
             //     self.last_cost.unwrap().get_real()

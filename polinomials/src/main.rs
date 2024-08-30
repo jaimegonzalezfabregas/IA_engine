@@ -6,9 +6,9 @@ use ia_engine::trainer::{DataPoint, Trainer};
 use piston_backend::draw_piston_window;
 use piston_window::{PistonWindow, WindowSettings};
 use plotters::prelude::*;
-use polinomial::Polinomial;
+use crate::polinomial::polinomial;
 
-fn polinomial(x: f32) -> f32 {
+fn base_func(x: f32) -> f32 {
     1. * (x * x * x * x * x) - 4. * (x * x * x * x) - 10. * (x * x * x)
         + 40. * (x * x)
         + 9. * x
@@ -23,8 +23,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let model = Polinomial::<6>::new();
-    let mut trainer = Trainer::new(model);
+    let mut trainer = Trainer::new(polinomial::<6,_>);
 
     let mut epoch = 10;
 
@@ -56,7 +55,7 @@ fn main() {
             .draw_series(LineSeries::new(
                 (-100..=100)
                     .map(|x| x as f32 / 20.0)
-                    .map(|x| (x, polinomial(x))),
+                    .map(|x| (x, base_func(x))),
                 &RED,
             ))?
             .label("y = x⁵ -4x⁴ -10x³ +40x² +9x -11")
@@ -66,7 +65,7 @@ fn main() {
             .draw_series(LineSeries::new(
                 (-100..=100)
                     .map(|x| x as f32 / 20.0)
-                    .map(|x| (x, trainer.eval([x])[0])),
+                    .map(|x| (x, polinomial(&params, &[x])[0])),
                 &BLUE,
             ))?
             // .label(format!(
@@ -87,7 +86,7 @@ fn main() {
         chart.draw_series(LineSeries::new(
             (-abs_max..abs_max)
                 .map(|x| x as f32 / SPEED as f32)
-                .map(|x| (x, polinomial(x))),
+                .map(|x| (x, base_func(x))),
             &GREEN_A700,
         ))?;
 
@@ -102,13 +101,13 @@ fn main() {
 }
 
 fn dataset_service<const P: usize>(epoch: isize) -> Vec<DataPoint<P, 1, 1>> {
-    let abs_max = SPEED * 5;
+    let abs_max = epoch;
     (-abs_max..abs_max)
         .map(|x| x as f32 / SPEED as f32)
         // .map(|x| x as f32 / 10.)
         .map(|x| DataPoint {
             input: [x],
-            output: [polinomial(x)],
+            output: [base_func(x)],
         })
         .collect::<Vec<_>>()
 }

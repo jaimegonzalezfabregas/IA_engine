@@ -802,6 +802,9 @@ dependencies = [
 [[package]]
 name = "ia_engine"
 version = "0.1.0"
+dependencies = [
+ "rand",
+]
 
 [[package]]
 name = "iana-time-zone"
@@ -1555,7 +1558,6 @@ dependencies = [
  "piston_window",
  "plotters",
  "plotters-backend",
- "rand",
 ]
 
 [[package]]
