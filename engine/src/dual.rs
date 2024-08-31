@@ -1,5 +1,7 @@
 use core::ops::*;
 
+use number_traits::{One, Pow, Sqrt, Zero};
+
 #[derive(Clone, Copy, Debug)]
 
 pub struct Dual<const P: usize> {
@@ -132,7 +134,7 @@ impl<const P: usize, N: Into<f32> + Copy> Mul<N> for Dual<P> {
         let mut ret = Dual {
             real: self.real * rhs.into(),
             sigma: [0.; P],
-        }; 
+        };
 
         for i in 0..P {
             ret.sigma[i] = self.sigma[i] * rhs.into()
@@ -169,7 +171,7 @@ impl<const P: usize> Div<Dual<P>> for Dual<P> {
 impl<const P: usize, N: Into<f32>> Div<N> for Dual<P> {
     type Output = Dual<P>;
 
-     fn div(self, rhs: N) -> Self::Output {
+    fn div(self, rhs: N) -> Self::Output {
         let rhs_real = rhs.into();
         let rhs_real_to_2 = rhs_real * rhs_real;
 
@@ -211,5 +213,52 @@ impl<const P: usize> PartialEq for Dual<P> {
 impl<const P: usize> PartialOrd for Dual<P> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.real.partial_cmp(&other.real)
+    }
+}
+
+// extended traits for https://docs.rs/number_traits/latest/number_traits/index.html
+
+impl<const P: usize> Sqrt for Dual<P> {
+    fn sqrt(&self) -> Self {
+        let real_sqrt = self.real.sqrt();
+
+        let mut ret = Dual {
+            real: real_sqrt,
+            sigma: [0.; P],
+        };
+
+        let double_real_sqrt = 2. * real_sqrt;
+
+        for i in 0..P {
+            ret.sigma[i] = self.sigma[i] / double_real_sqrt;
+        }
+
+        ret
+    }
+}
+
+impl<const P: usize> Zero for Dual<P> {
+    fn zero() -> Self {
+        Self {
+            real: 0.,
+            sigma: [0.; P],
+        }
+    }
+
+    fn is_zero(&self) -> bool {
+        self.real.is_zero()
+    }
+}
+
+impl<const P: usize> One for Dual<P> {
+    fn one() -> Self {
+        Self {
+            real: 1.,
+            sigma: [0.; P],
+        }
+    }
+
+    fn is_one(&self) -> bool {
+        self.real.is_one()
     }
 }

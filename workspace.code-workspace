@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "polinomials"
+		},
+		{
+			"path": "image_compresor"
 		}
 	],
 	"settings": {}
