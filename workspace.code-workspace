@@ -7,7 +7,7 @@
 			"path": "polinomials"
 		},
 		{
-			"path": "image_compresor"
+			"path": "image_tiler"
 		}
 	],
 	"settings": {}

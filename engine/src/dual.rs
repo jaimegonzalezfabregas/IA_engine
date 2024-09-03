@@ -1,6 +1,6 @@
 use core::ops::*;
 
-use number_traits::{One, Pow, Sqrt, Zero};
+use number_traits::{ApproxEq, Bounded, Float, Num, One, Pow, Round, Signed, Sqrt, Zero};
 
 #[derive(Clone, Copy, Debug)]
 
@@ -42,6 +42,13 @@ impl<const P: usize> Dual<P> {
         let mut ret = Self::cero();
         ret.real = real;
         ret
+    }
+
+    pub fn new_full(real: f32, sigma: [f32; P]) -> Self{
+        Self {
+            real,
+            sigma
+        }
     }
 }
 

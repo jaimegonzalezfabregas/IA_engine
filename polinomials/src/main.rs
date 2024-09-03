@@ -23,7 +23,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut trainer = Trainer::new(polinomial::<6,_>);
+    let mut trainer = Trainer::new(polinomial::<6,_>, |x|*x);
 
     let mut epoch = 10;
 

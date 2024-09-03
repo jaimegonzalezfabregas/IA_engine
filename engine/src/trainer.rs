@@ -1,8 +1,10 @@
 use std::array;
 
-use rand::Rng;
-
 use crate::dual::Dual;
+use indicatif::ParallelProgressIterator;
+use rand::Rng;
+use rayon::iter::IntoParallelRefIterator;
+use rayon::prelude::*;
 
 #[derive(Debug)]
 pub struct DataPoint<const P: usize, const I: usize, const O: usize> {
@@ -29,46 +31,61 @@ pub struct Trainer<
     const I: usize,
     const O: usize,
     F: Fn(&[Dual<P>; P], &[Dual<P>; I]) -> [Dual<P>; O],
+        G: Fn(&[Dual<P>; P]) -> [Dual<P>; P],
 > {
     model: F,
     params: [Dual<P>; P],
     last_cost: Option<Dual<P>>,
     learning_factor: f32,
+    param_transformer: G
 }
 
 impl<
         const P: usize,
         const I: usize,
         const O: usize,
-        F: Fn(&[Dual<P>; P], &[Dual<P>; I]) -> [Dual<P>; O],
-    > Trainer<P, I, O, F>
+        F: Fn(&[Dual<P>; P], &[Dual<P>; I]) -> [Dual<P>; O] + Sync,
+        G: Fn(&[Dual<P>; P]) -> [Dual<P>; P],
+    > Trainer<P, I, O, F, G>
 {
     pub fn get_model_params(&self) -> [f32; P] {
         self.params.map(|e| e.get_real())
     }
 
     fn cost(&self, dataset: &Vec<DataPoint<P, I, O>>) -> Dual<P> {
-        let mut cost = Dual::cero();
+        let params = &self.params;
+        let model = &self.model;
 
-        for data_point in dataset.iter() {
-            let prediction = (self.model)(&self.params, &data_point.input.map(|e| Dual::new(e)));
-            let case_cost = data_point.cost(prediction);
+        dataset
+            .par_iter()
+            // .progress_count(dataset.len() as u64)
+            .map(|data_point| {
+                let prediction = (model)(&params, &data_point.input.map(|e| Dual::new(e)));
 
-            cost += case_cost;
-        }
+                let case_cost = data_point.cost(prediction);
 
-        cost / dataset.len() as u16
+                case_cost / dataset.len() as f32
+            })
+            .reduce(|| Dual::cero(), |acc, cost| acc + cost)
     }
 
-    pub fn new(trainable: F) -> Self {
+    pub fn new(trainable: F,  param_transformer: G) -> Self {
+        rayon::ThreadPoolBuilder::new()
+            .stack_size(1 * 1024 * 1024 * 1024)
+            .build_global()
+            .unwrap();
+
         let mut rng = rand::thread_rng();
         Self {
             model: trainable,
             params: array::from_fn(|i| Dual::new_param(rng.gen(), i)),
             last_cost: None,
             learning_factor: 1.,
+            param_transformer,
         }
     }
+
+    // TODO return a proper error when NaN apears
 
     pub fn train_step(&mut self, dataset: &Vec<DataPoint<P, I, O>>) -> bool {
         let cost = match self.last_cost {
@@ -81,14 +98,17 @@ impl<
         let og_parameters = self.params.map(|e| e.get_real());
 
         let cost_to_beat = cost.get_real();
-        // println!("cost to beat: {cost_to_beat}");
 
         let mut learning_factor = self.learning_factor;
 
         while self.last_cost.unwrap().get_real() >= cost_to_beat {
-            self.params = array::from_fn(|i| {
-                Dual::new_param(og_parameters[i] - unit_gradient[i] * learning_factor, i)
-            });
+            self.params = (self.param_transformer)(&array::from_fn(|i| {
+                Dual::new_param(
+                    (og_parameters[i] - unit_gradient[i] * learning_factor)
+                      ,
+                    i,
+                )
+            }));
             self.last_cost = Some(self.cost(dataset));
             // println!(
             //     "    improvement: {learning_factor} {}",
