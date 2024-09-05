@@ -27,20 +27,17 @@ fn main() {
 
     let mut epoch = 10;
 
-    while let Some(_) = draw_piston_window(&mut window, |b| {
+    while let Some(_) = draw_piston_window(&mut window, |b|  {
         for _ in 0..1000 {
             let done = trainer.train_step(&dataset_service(epoch));
             if !done {
-                println!("local minimum for {epoch}");
                 epoch += 1;
-                epoch %= SPEED * 5;
-                epoch = epoch.max(SPEED);
                 break;
             }
         }
 
         let params = trainer.get_model_params();
-        println!("{:?}", params);
+        // println!("{:?}", params);
 
         let root = b.into_drawing_area();
         root.fill(&WHITE)?;
@@ -97,7 +94,11 @@ fn main() {
             .draw()?;
 
         Ok(())
-    }) {}
+    })  {
+        if epoch > SPEED * 4 {
+            break;
+        }
+    }
 }
 
 fn dataset_service<const P: usize>(epoch: isize) -> Vec<DataPoint<P, 1, 1>> {

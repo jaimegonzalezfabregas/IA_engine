@@ -4,7 +4,7 @@ use number_traits::{One, Sqrt, Zero};
 
 use crate::{dense_simd::DenseSimd, hybrid_simd::HybridSimd, sparse_simd::SparseSimd};
 
-type Simd<const P: usize> = SparseSimd<P>;
+type Simd<const P: usize> = HybridSimd<P>;
 
 #[derive(Clone, Copy, Debug)]
 

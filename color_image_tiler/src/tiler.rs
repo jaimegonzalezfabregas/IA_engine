@@ -3,7 +3,7 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 use number_traits::{One, Sqrt, Zero};
 use std::fmt::Debug;
 
-use crate::TILE_COUNT;
+use crate::{TILE_BIAS, TILE_COUNT};
 
 // [x,y, r, g, b]
 pub fn tiler<
@@ -27,8 +27,6 @@ pub fn tiler<
     params: &[N; TILE_COUNT * 5],
     input: &[N; 2], _:&()
 ) -> [N; 3] {
-    const BIAS: f32 = 0.9;
-
     let cells: Vec<_> = params.array_chunks::<5>().collect();
 
     let mut closest_d = N::from(1.);
@@ -58,7 +56,7 @@ pub fn tiler<
 
     let [_, _, closest_r, closest_g, closest_b] = *cells[closest_i];
 
-    if closest_d < BIAS {
+    if closest_d < TILE_BIAS {
         [closest_r, closest_b, closest_g]
     } else {
 
@@ -70,10 +68,10 @@ pub fn tiler<
 
         let mix_factor = closest_d / second_closest_d;
 
-        let biased_mix_factor = if mix_factor < BIAS {
+        let biased_mix_factor = if mix_factor < TILE_BIAS {
             N::zero()
         }else{
-            (mix_factor -BIAS) / (1. - BIAS)
+            (mix_factor -TILE_BIAS) / (1. - TILE_BIAS)
         };
 
         let anti_biased_mix_factor = - biased_mix_factor + 1.;

@@ -56,6 +56,7 @@ impl<const S: usize> SparseSimd<S> {
     }
 
     pub(crate) fn merge_over_fn<F: Fn(f32, f32) -> f32>(&self, rhs: &Self, merger: F) -> Self {
+
         let mut ret = Self {
             data_index: [S; S],
             data: [0.; S],
@@ -131,8 +132,9 @@ impl<const S: usize> IndexMut<usize> for SparseSimd<S> {
         if self.data_index[dereference_index] == index {
             &mut self.data[dereference_index]
         } else {
-            self.data_index[dereference_index..].rotate_right(1);
-            self.data[dereference_index..].rotate_right(1);
+            self.size+=1;
+            self.data_index[dereference_index..self.size].rotate_right(1);
+            self.data[dereference_index..self.size].rotate_right(1);
 
             self.data_index[dereference_index] = index;
             &mut self.data[dereference_index]
@@ -186,7 +188,6 @@ impl<const S: usize> Div<f32> for SparseSimd<S> {
 mod tests {
     use crate::sparse_simd::SparseSimd;
     use rand::{self, seq::SliceRandom};
-    use rayon::array;
     use std::array::from_fn;
 
     #[test]
@@ -219,8 +220,8 @@ mod tests {
         let res: [f32; N] = from_fn(|i| res_vec[i]);
 
         assert_eq!(
-            SparseSimd::new_from_array(&a) + SparseSimd::new_from_array(&b),
-            SparseSimd::new_from_array(&res)
+            (SparseSimd::new_from_array(&a) + SparseSimd::new_from_array(&b)).to_array(),
+            res
         )
     }
 
@@ -233,8 +234,8 @@ mod tests {
         let res: [f32; N] = from_fn(|i| res_vec[i]);
 
         assert_eq!(
-            SparseSimd::new_from_array(&a) * SparseSimd::new_from_array(&b),
-            SparseSimd::new_from_array(&res)
+            (SparseSimd::new_from_array(&a) * SparseSimd::new_from_array(&b)).to_array(),
+            res
         )
     }
 
@@ -247,13 +248,13 @@ mod tests {
         let res: [f32; N] = from_fn(|i| res_vec[i]);
 
         assert_eq!(
-            SparseSimd::new_from_array(&a) - SparseSimd::new_from_array(&b),
-            SparseSimd::new_from_array(&res)
+            (SparseSimd::new_from_array(&a) - SparseSimd::new_from_array(&b)).to_array(),
+    res
         )
     }
 
     #[test]
-    fn stress_test() {
+    fn arithmetic_stress_test() {
         for _ in 0..1000 {
             let cero_ratio: f32 = rand::random();
             let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
@@ -262,6 +263,47 @@ mod tests {
             test_add(a, b);
             test_mul(a, b);
             test_sub(a, b);
+
+            assert_eq!(a, SparseSimd::new_from_array(&a).to_array())
+        }
+    }
+
+     #[test]
+    fn consistency_stress_test() {
+        for _ in 0..1000 {
+            let cero_ratio: f32 = rand::random();
+            let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
+
+            assert_eq!(a, SparseSimd::new_from_array(&a).to_array())
+        }
+    }
+
+    fn test_mul_scalar<const N: usize>(a: [f32; N], b: f32) {
+        let res = a.map(|a_elm| a_elm * b);
+
+        assert_eq!(
+            (SparseSimd::new_from_array(&a) * b).to_array(),
+            res
+        )
+    }
+
+    fn test_div_scalar<const N: usize>(a: [f32; N], b: f32) {
+        let res = a.map(|a_elm| a_elm / b);
+
+        assert_eq!(
+            (SparseSimd::new_from_array(&a) / b).to_array(),
+            res
+        )
+    }
+
+    #[test]
+    fn stress_test_scalar() {
+        for _ in 0..1000 {
+            let cero_ratio: f32 = rand::random();
+            let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
+            let b = rand::random();
+            test_mul_scalar(a, b);
+            test_div_scalar(a, b);
         }
     }
 
@@ -275,12 +317,60 @@ mod tests {
             for j in 0..10 {
                 if i == j {
                     assert_eq!(1., x[j]);
+                    assert_eq!(1., x.to_array()[j]);
                 } else {
                     assert_eq!(0., x[j]);
+                    assert_eq!(0., x.to_array()[j]);
                 }
             }
         }
     }
+
+    #[test]
+    fn stress_test_to_array() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..1000 {
+            let cero_ratio: f32 = rand::random();
+            let a: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
+
+            let mut x: SparseSimd<4> = SparseSimd::zero();
+            let mut order = (0..4).collect::<Vec<_>>();
+            order.shuffle(&mut rng);
+            for i in order {
+                x[i] = a[i];
+                println!("{:?} -> {:?}",x,x.to_array());
+                assert_eq!(x.to_array()[i], a[i]);
+            }
+
+            for i in 0..4 {
+                assert_eq!(x.to_array()[i], a[i]);
+            }
+        }
+    }
+
+
+    #[test]
+    fn stress_test_to_array_overriding() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..1000 {
+            let cero_ratio: f32 = rand::random();
+            let a: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
+            let b: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
+
+            let mut y: SparseSimd<4> = SparseSimd::new_from_array(&b);
+            let mut order = (0..4).collect::<Vec<_>>();
+            order.shuffle(&mut rng);
+            for i in order {
+                y[i] = a[i];
+                assert_eq!(y.to_array()[i], a[i]);
+            }
+
+            for i in 0..4 {
+                assert_eq!(y.to_array()[i], a[i]);
+            }
+        }
+    }
+
 
     #[test]
     fn stress_test_indexing() {
@@ -299,11 +389,10 @@ mod tests {
                 y[i] = a[i];
             }
 
-            for i in 0..32{
-                assert_eq!(x[i],a[i]);
-                assert_eq!(y[i],a[i]);
+            for i in 0..32 {
+                assert_eq!(x[i], a[i]);
+                assert_eq!(y[i], a[i]);
             }
-
         }
     }
 

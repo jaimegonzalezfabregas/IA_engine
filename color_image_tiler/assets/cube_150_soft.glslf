@@ -9,9 +9,6 @@ uniform sampler2D t_point;
 uniform sampler2D t_color;
 
 void main() {
-
-    float BIAS = 0.9;
-
     float closest_d = 1;
     int closest_i = 0;
     float second_closest_d = 1;
@@ -46,10 +43,10 @@ void main() {
 
     float factor = closest_d / second_closest_d;
 
-    if(factor < BIAS){
+    if(factor < TILE_BIAS){
         factor = 0;
     }else{
-        factor = (factor -BIAS) / (1 - BIAS);
+        factor = (factor -TILE_BIAS) / (1 - TILE_BIAS);
     }
 
     o_Color = mix(closest_col, mix(closest_col, second_closest_col, 0.5), factor);

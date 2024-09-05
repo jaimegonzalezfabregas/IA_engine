@@ -11,6 +11,12 @@
 		},
 		{
 			"path": "color_image_tiler"
+		},
+		{
+			"path": "hello_world"
+		},
+		{
+			"path": "polinomials_benchmark"
 		}
 	],
 	"settings": {}

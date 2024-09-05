@@ -17,8 +17,8 @@ impl<const P: usize, const I: usize, const O: usize> DataPoint<P, I, O> {
 
         for (pred_val, goal_val) in prediction.iter().zip(self.output.iter()) {
             let diff = *pred_val - Dual::new(*goal_val);
-            let diff_sqr = diff.abs();
-            ret += diff_sqr;
+            let diff_sqr = diff * diff;
+            ret += diff_sqr / 2.;
         }
 
         ret
@@ -107,7 +107,7 @@ impl<
         let unit_gradient = self.last_cost.unwrap().get_gradient();
         let og_parameters = self.params.map(|e| e.get_real());
 
-        // println!("{:?}", unit_gradient);
+        //  println!("unit_gradient: {:?}", unit_gradient);
 
         assert_eq!(false, unit_gradient.iter().fold(false, |acc, x| acc || !x.is_finite()));
 
@@ -135,7 +135,7 @@ impl<
         }
 
         self.learning_factor = learning_factor * 2.;
-        println!("self.learning_factor {}", self.learning_factor);
+        // println!("self.learning_factor {}", self.learning_factor);
 
         return true;
     }

@@ -35,7 +35,8 @@ impl Vertex {
     }
 }
 
-const TILE_COUNT: usize = 50;
+const TILE_COUNT: usize = 15;
+const TILE_BIAS: f32 = 0.1;
 
 gfx_defines! {
 
@@ -92,11 +93,7 @@ fn main() {
     let pso = factory
         .create_pipeline_simple(
             Shaders::new()
-                .set(
-                    GLSL::V1_50,
-                    &include_str!("../assets/cube_150.glslv")
-                        .replace("TILE_COUNT", &format!("{TILE_COUNT}")),
-                )
+                .set(GLSL::V1_50, &include_str!("../assets/cube_150.glslv"))
                 .get(glsl)
                 .unwrap()
                 .as_bytes(),
@@ -104,7 +101,8 @@ fn main() {
                 .set(
                     GLSL::V1_50,
                     &include_str!("../assets/cube_150_soft.glslf")
-                        .replace("TILE_COUNT", &format!("{TILE_COUNT}")),
+                        .replace("TILE_COUNT", &format!("{TILE_COUNT}"))
+                        .replace("TILE_BIAS", &format!("{TILE_BIAS}")),
                 )
                 .get(glsl)
                 .unwrap()
@@ -116,13 +114,14 @@ fn main() {
     let (train_tx, train_rx) = channel();
     let (stats_tx, stats_rx) = channel();
 
-    let train_builder = thread::Builder::new().name("train_thread".into()).stack_size(2*1024*1024*1024);
+    let train_builder = thread::Builder::new()
+        .name("train_thread".into())
+        .stack_size(2 * 1024 * 1024 * 1024);
 
     let stats_builder = thread::Builder::new().name("stats_thread".into());
 
     train_builder.spawn(|| train_thread(train_tx)).unwrap();
     stats_builder.spawn(|| stats_thread(stats_rx)).unwrap();
-
 
     let mut params = [0.; TILE_COUNT * 5];
     //println!("updated_image {params:?}");

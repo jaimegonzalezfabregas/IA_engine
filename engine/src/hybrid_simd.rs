@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Index, IndexMut, Mul, Sub};
+use std::{env, ops::{Add, Div, Index, IndexMut, Mul, Sub}};
 
 use crate::{dense_simd::DenseSimd, sparse_simd::SparseSimd};
 
@@ -28,7 +28,7 @@ impl<const S: usize> HybridSimd<S> {
         match self {
             HybridSimd::Dense(_) => self,
             HybridSimd::Sparse(x) => {
-                if x.non_zero_count() > S * 2 / 3 {
+                if x.non_zero_count() > env::args().next().unwrap_or("1".to_string()).parse().unwrap_or(1) {
                     self.decay()
                 } else {
                     self
