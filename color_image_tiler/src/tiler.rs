@@ -27,7 +27,7 @@ pub fn tiler<
     params: &[N; TILE_COUNT * 5],
     input: &[N; 2], _:&()
 ) -> [N; 3] {
-    const BIAS: f32 = 0.1;
+    const BIAS: f32 = 0.9;
 
     let cells: Vec<_> = params.array_chunks::<5>().collect();
 

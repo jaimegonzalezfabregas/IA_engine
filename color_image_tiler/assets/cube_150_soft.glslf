@@ -10,7 +10,7 @@ uniform sampler2D t_color;
 
 void main() {
 
-    float BIAS = 0.2;
+    float BIAS = 0.9;
 
     float closest_d = 1;
     int closest_i = 0;

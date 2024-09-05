@@ -2,9 +2,9 @@ use core::ops::*;
 
 use number_traits::{One, Sqrt, Zero};
 
-use crate::{dense_simd::DenseSimd, hybrid_simd::HybridSimd};
+use crate::{dense_simd::DenseSimd, hybrid_simd::HybridSimd, sparse_simd::SparseSimd};
 
-type Simd<const P: usize> = DenseSimd<P>;
+type Simd<const P: usize> = SparseSimd<P>;
 
 #[derive(Clone, Copy, Debug)]
 
@@ -51,7 +51,7 @@ impl<const P: usize> Dual<P> {
     pub fn new_full(real: f32, sigma: &[f32; P]) -> Self {
         Self {
             real,
-            sigma: DenseSimd::new_from_array(sigma),
+            sigma: Simd::new_from_array(sigma),
         }
     }
 

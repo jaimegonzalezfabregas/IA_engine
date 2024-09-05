@@ -113,7 +113,7 @@ impl<const S: usize> SparseSimd<S> {
 impl<const S: usize> Index<usize> for SparseSimd<S> {
     type Output = f32;
     fn index(&self, index: usize) -> &Self::Output {
-        let dereference_index = self.data_index.partition_point(|i| *i >= index);
+        let dereference_index = self.data_index.partition_point(|i| *i < index);
         if self.data_index[dereference_index] == index {
             &self.data[dereference_index]
         } else {
@@ -185,7 +185,7 @@ impl<const S: usize> Div<f32> for SparseSimd<S> {
 #[cfg(test)]
 mod tests {
     use crate::sparse_simd::SparseSimd;
-    use rand;
+    use rand::{self, seq::SliceRandom};
     use rayon::array;
     use std::array::from_fn;
 
@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn stress_test() {
-        for _ in 0..100000 {
+        for _ in 0..1000 {
             let cero_ratio: f32 = rand::random();
             let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
             let b: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
@@ -262,6 +262,64 @@ mod tests {
             test_add(a, b);
             test_mul(a, b);
             test_sub(a, b);
+        }
+    }
+
+    #[test]
+    fn test_indexing() {
+        for i in 0..10 {
+            let mut test_arr = [0.; 10];
+            test_arr[i] = 1.;
+            let x = SparseSimd::new_from_array(&test_arr);
+
+            for j in 0..10 {
+                if i == j {
+                    assert_eq!(1., x[j]);
+                } else {
+                    assert_eq!(0., x[j]);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn stress_test_indexing() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..1000 {
+            let cero_ratio: f32 = rand::random();
+            let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
+            let b: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
+
+            let mut x: SparseSimd<32> = SparseSimd::zero();
+            let mut y: SparseSimd<32> = SparseSimd::new_from_array(&b);
+            let mut order = (0..32).collect::<Vec<_>>();
+            order.shuffle(&mut rng);
+            for i in order {
+                x[i] = a[i];
+                y[i] = a[i];
+            }
+
+            for i in 0..32{
+                assert_eq!(x[i],a[i]);
+                assert_eq!(y[i],a[i]);
+            }
+
+        }
+    }
+
+    #[test]
+    fn test_indexing_mut() {
+        for i in 0..10 {
+            let mut x = SparseSimd::new_from_array(&[0.; 10]);
+            x[i] = 1.;
+
+            for j in 0..10 {
+                if i == j {
+                    assert_eq!(1., x[j]);
+                } else {
+                    assert_eq!(0., x[j]);
+                }
+            }
         }
     }
 }

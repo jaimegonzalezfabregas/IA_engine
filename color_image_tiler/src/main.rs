@@ -35,7 +35,7 @@ impl Vertex {
     }
 }
 
-const TILE_COUNT: usize = 300;
+const TILE_COUNT: usize = 50;
 
 gfx_defines! {
 
