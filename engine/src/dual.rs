@@ -1,12 +1,16 @@
 use core::ops::*;
 
-use number_traits::{ApproxEq, Bounded, Float, Num, One, Pow, Round, Signed, Sqrt, Zero};
+use number_traits::{One, Sqrt, Zero};
+
+use crate::{dense_simd::DenseSimd, hybrid_simd::HybridSimd};
+
+type Simd<const P: usize> = DenseSimd<P>;
 
 #[derive(Clone, Copy, Debug)]
 
 pub struct Dual<const P: usize> {
     real: f32,
-    sigma: [f32; P],
+    sigma: Simd<P>,
 }
 
 impl<const P: usize> From<f32> for Dual<P> {
@@ -19,12 +23,12 @@ impl<const P: usize> Dual<P> {
     pub fn cero() -> Self {
         Self {
             real: 0.,
-            sigma: [0.; P],
+            sigma: Simd::zero(),
         }
     }
 
     pub fn get_gradient(&self) -> [f32; P] {
-        self.sigma
+        self.sigma.to_array()
     }
 
     pub fn get_real(&self) -> f32 {
@@ -44,10 +48,18 @@ impl<const P: usize> Dual<P> {
         ret
     }
 
-    pub fn new_full(real: f32, sigma: [f32; P]) -> Self{
+    pub fn new_full(real: f32, sigma: &[f32; P]) -> Self {
         Self {
             real,
-            sigma
+            sigma: DenseSimd::new_from_array(sigma),
+        }
+    }
+
+    pub fn abs(&self) -> Dual<P> {
+        if *self < 0. {
+            -*self
+        } else {
+            *self
         }
     }
 }
@@ -56,26 +68,21 @@ impl<const P: usize> Add<Dual<P>> for Dual<P> {
     type Output = Dual<P>;
 
     fn add(self, rhs: Dual<P>) -> Self::Output {
-        let mut ret = Dual {
+        assert_finite(Dual {
             real: self.real + rhs.real,
-            sigma: [0.; P],
-        };
-        for i in 0..P {
-            ret.sigma[i] = self.sigma[i] + rhs.sigma[i]
-        }
-
-        ret
+            sigma: self.sigma + rhs.sigma,
+        })
     }
 }
 
-impl<const P: usize, N: Into<f32>> Add<N> for Dual<P> {
+impl<const P: usize> Add<f32> for Dual<P> {
     type Output = Dual<P>;
 
-    fn add(self, rhs: N) -> Self::Output {
-        Dual {
-            real: self.real + rhs.into(),
+    fn add(self, rhs: f32) -> Self::Output {
+        assert_finite(Dual {
+            real: self.real + rhs,
             sigma: self.sigma,
-        }
+        })
     }
 }
 
@@ -89,26 +96,21 @@ impl<const P: usize> Sub<Dual<P>> for Dual<P> {
     type Output = Dual<P>;
 
     fn sub(self, rhs: Dual<P>) -> Self::Output {
-        let mut ret = Dual {
+        assert_finite(Dual {
             real: self.real - rhs.real,
-            sigma: [0.; P],
-        };
-        for i in 0..P {
-            ret.sigma[i] = self.sigma[i] - rhs.sigma[i]
-        }
-
-        ret
+            sigma: self.sigma - rhs.sigma,
+        })
     }
 }
 
-impl<const P: usize, N: Into<f32>> Sub<N> for Dual<P> {
+impl<const P: usize> Sub<f32> for Dual<P> {
     type Output = Dual<P>;
 
-    fn sub(self, rhs: N) -> Self::Output {
-        Dual {
-            real: self.real - rhs.into(),
+    fn sub(self, rhs: f32) -> Self::Output {
+        assert_finite(Dual {
+            real: self.real - rhs,
             sigma: self.sigma,
-        }
+        })
     }
 }
 
@@ -122,32 +124,21 @@ impl<const P: usize> Mul<Dual<P>> for Dual<P> {
     type Output = Dual<P>;
 
     fn mul(self, rhs: Dual<P>) -> Self::Output {
-        let mut ret = Dual {
+        assert_finite(Dual {
             real: self.real * rhs.real,
-            sigma: [0.; P],
-        };
-        for i in 0..P {
-            ret.sigma[i] = self.real * rhs.sigma[i] + self.sigma[i] * rhs.real
-        }
-
-        ret
+            sigma: (rhs.sigma * self.real) + (self.sigma * rhs.real),
+        })
     }
 }
 
-impl<const P: usize, N: Into<f32> + Copy> Mul<N> for Dual<P> {
+impl<const P: usize> Mul<f32> for Dual<P> {
     type Output = Dual<P>;
 
-    fn mul(self, rhs: N) -> Self::Output {
-        let mut ret = Dual {
-            real: self.real * rhs.into(),
-            sigma: [0.; P],
-        };
-
-        for i in 0..P {
-            ret.sigma[i] = self.sigma[i] * rhs.into()
-        }
-
-        ret
+    fn mul(self, rhs: f32) -> Self::Output {
+        assert_finite(Dual {
+            real: self.real * rhs,
+            sigma: self.sigma * rhs,
+        })
     }
 }
 
@@ -161,36 +152,21 @@ impl<const P: usize> Div<Dual<P>> for Dual<P> {
     type Output = Dual<P>;
 
     fn div(self, rhs: Dual<P>) -> Self::Output {
-        let rhs_real_to_2 = rhs.real * rhs.real;
-
-        let mut ret = Dual {
+        assert_finite(Dual {
             real: self.real / rhs.real,
-            sigma: [0.; P],
-        };
-        for i in 0..P {
-            ret.sigma[i] = (self.sigma[i] * rhs.real - self.real * rhs.sigma[i]) / rhs_real_to_2
-        }
-
-        ret
+            sigma: ((self.sigma * rhs.real) - (rhs.sigma * self.real)) / (rhs.real * rhs.real),
+        })
     }
 }
 
-impl<const P: usize, N: Into<f32>> Div<N> for Dual<P> {
+impl<const P: usize> Div<f32> for Dual<P> {
     type Output = Dual<P>;
 
-    fn div(self, rhs: N) -> Self::Output {
-        let rhs_real = rhs.into();
-        let rhs_real_to_2 = rhs_real * rhs_real;
-
-        let mut ret = Dual {
-            real: self.real / rhs_real,
-            sigma: [0.; P],
-        };
-        for i in 0..P {
-            ret.sigma[i] = (self.sigma[i] * rhs_real) / rhs_real_to_2
-        }
-
-        ret
+    fn div(self, rhs: f32) -> Self::Output {
+        assert_finite(Dual {
+            real: self.real / rhs,
+            sigma: self.sigma / rhs,
+        })
     }
 }
 
@@ -204,10 +180,7 @@ impl<const P: usize> Neg for Dual<P> {
     type Output = Dual<P>;
 
     fn neg(self) -> Self::Output {
-        self * Dual {
-            real: -1.,
-            sigma: [0.; P],
-        }
+        self * Dual::from(-1.)
     }
 }
 
@@ -227,20 +200,10 @@ impl<const P: usize> PartialOrd for Dual<P> {
 
 impl<const P: usize> Sqrt for Dual<P> {
     fn sqrt(&self) -> Self {
-        let real_sqrt = self.real.sqrt();
-
-        let mut ret = Dual {
-            real: real_sqrt,
-            sigma: [0.; P],
-        };
-
-        let double_real_sqrt = 2. * real_sqrt;
-
-        for i in 0..P {
-            ret.sigma[i] = self.sigma[i] / double_real_sqrt;
-        }
-
-        ret
+        assert_finite(Dual {
+            real: self.real.sqrt(),
+            sigma: self.sigma / (2. * self.real.sqrt()),
+        })
     }
 }
 
@@ -248,7 +211,7 @@ impl<const P: usize> Zero for Dual<P> {
     fn zero() -> Self {
         Self {
             real: 0.,
-            sigma: [0.; P],
+            sigma: Simd::zero(),
         }
     }
 
@@ -261,11 +224,40 @@ impl<const P: usize> One for Dual<P> {
     fn one() -> Self {
         Self {
             real: 1.,
-            sigma: [0.; P],
+            sigma: Simd::zero(),
         }
     }
 
     fn is_one(&self) -> bool {
         self.real.is_one()
     }
+}
+
+impl<const P: usize> Eq for Dual<P> {}
+
+impl<const P: usize> PartialEq<f32> for Dual<P> {
+    fn eq(&self, other: &f32) -> bool {
+        self.real.eq(other)
+    }
+}
+
+impl<const P: usize> PartialOrd<f32> for Dual<P> {
+    fn partial_cmp(&self, other: &f32) -> Option<std::cmp::Ordering> {
+        self.real.partial_cmp(other)
+    }
+}
+
+impl<const P: usize> From<Dual<P>> for f32 {
+    fn from(value: Dual<P>) -> Self {
+        value.get_real()
+    }
+}
+
+fn assert_finite<const P: usize>(a: Dual<P>) -> Dual<P> {
+    assert!(a.get_real().is_finite());
+    assert!(a
+        .get_gradient()
+        .iter()
+        .fold(true, |acc, x| acc && x.is_finite()));
+    a
 }

@@ -9,6 +9,7 @@ pub fn polinomial<
 >(
     params: &[N; G],
     input: &[N; 1],
+    _: &()
 ) -> [N; 1] {
     let mut ret = N::from(0.);
     let mut x_to_the_nth = N::from(1.);

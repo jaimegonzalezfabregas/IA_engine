@@ -1,6 +1,5 @@
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
-use image::{DynamicImage, GenericImageView};
 use number_traits::{One, Sqrt, Zero};
 use std::fmt::Debug;
 
@@ -10,7 +9,6 @@ use crate::TILE_COUNT;
 pub fn tiler<
     N: Copy
         + From<f32>
-        + Into<f32>
         + Sub<Output = N>
         + Add<Output = N>
         + Mul<Output = N>
@@ -26,13 +24,12 @@ pub fn tiler<
         + Div<f32, Output = N>
         + Add<f32, Output = N>,
 >(
-    params: &[N; TILE_COUNT * 2],
-    input: &[N; 2],
-    img: &DynamicImage,
+    params: &[N; TILE_COUNT * 5],
+    input: &[N; 2], _:&()
 ) -> [N; 3] {
-    const BIAS: f32 = 0.002;
+    const BIAS: f32 = 0.1;
 
-    let cells: Vec<_> = params.array_chunks::<2>().collect();
+    let cells: Vec<_> = params.array_chunks::<5>().collect();
 
     let mut closest_d = N::from(1.);
     let mut closest_i = 0;
@@ -40,7 +37,7 @@ pub fn tiler<
     let mut second_closest_i = 0;
 
     for i in 0..TILE_COUNT {
-        let [x, y] = *cells[i];
+        let [x, y, _, _, _] = *cells[i];
 
         let x_d = x - input[0];
         let y_d = y - input[1];
@@ -59,21 +56,13 @@ pub fn tiler<
         }
     }
 
-    let [closest_x, closest_y] = *cells[closest_i];
-    let [closest_r, closest_g, closest_b, _] = img
-            .get_pixel((closest_x.into() * 999.) as u32, (closest_y.into() * 999.) as u32)
-        .0
-        .map(|val| N::from(val as f32 / u8::MAX as f32));
+    let [_, _, closest_r, closest_g, closest_b] = *cells[closest_i];
 
     if closest_d < BIAS {
         [closest_r, closest_b, closest_g]
     } else {
-        let [second_closest_x, second_closest_y] = *cells[second_closest_i];
 
-        let [second_closest_r, second_closest_g, second_closest_b, _] = img
-            .get_pixel((second_closest_x.into() * 999.) as u32, (second_closest_y.into() * 999.) as u32)
-            .0
-            .map(|val| N::from(val as f32 / u8::MAX as f32));
+        let [_, _, second_closest_r, second_closest_g, second_closest_b] = *cells[second_closest_i];
 
         let half_r = closest_r + second_closest_r / 2.;
         let half_g = closest_g + second_closest_g / 2.;
@@ -83,11 +72,11 @@ pub fn tiler<
 
         let biased_mix_factor = if mix_factor < BIAS {
             N::zero()
-        } else {
-            (mix_factor - BIAS) / (1. - BIAS)
+        }else{
+            (mix_factor -BIAS) / (1. - BIAS)
         };
 
-        let anti_biased_mix_factor = -biased_mix_factor + 1.;
+        let anti_biased_mix_factor = - biased_mix_factor + 1.;
 
         [
             closest_r * anti_biased_mix_factor + half_r * biased_mix_factor,

@@ -23,7 +23,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut trainer = Trainer::new(polinomial::<6,_>, |x|*x);
+    let mut trainer = Trainer::new(polinomial::<6,_>, |x|*x, ());
 
     let mut epoch = 10;
 
@@ -65,7 +65,7 @@ fn main() {
             .draw_series(LineSeries::new(
                 (-100..=100)
                     .map(|x| x as f32 / 20.0)
-                    .map(|x| (x, polinomial(&params, &[x])[0])),
+                    .map(|x| (x, polinomial(&params, &[x], &())[0])),
                 &BLUE,
             ))?
             // .label(format!(

@@ -11,3 +11,4 @@ plotters-backend = "0.3.5"
 piston_window = "0.120.0"
 ia_engine = { path = "../engine" } 
 threadpool = "1.8.1"
+rand = "0.8.5"

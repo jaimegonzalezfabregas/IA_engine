@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "image_tiler"
+		},
+		{
+			"path": "color_image_tiler"
 		}
 	],
 	"settings": {}

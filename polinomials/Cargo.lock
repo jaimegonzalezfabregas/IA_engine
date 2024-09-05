@@ -1625,6 +1625,7 @@ dependencies = [
  "piston_window",
  "plotters",
  "plotters-backend",
+ "rand",
  "threadpool",
 ]
 

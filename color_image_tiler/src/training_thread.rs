@@ -6,18 +6,19 @@ use ia_engine::{
 };
 use image::{imageops::FilterType::Triangle, DynamicImage, GenericImageView, ImageReader};
 
-use crate::{tiler, IMAGE_PATH, TILE_COUNT};
 
-pub fn train_thread(tx: Sender<([f32; TILE_COUNT * 2], Option<f32>)>) {
-    let img = ImageReader::open(IMAGE_PATH).unwrap().decode().unwrap();
+use crate::{tiler, TILE_COUNT};
 
-    let mut trainer = Trainer::new(
-        tiler,
-        |e| e.map(|p| Dual::new_full(p.get_real().min(1.).max(0.), &p.get_gradient())),
-        img.resize(1000, 1000, image::imageops::FilterType::CatmullRom),
-    );
-    
+pub fn train_thread(tx: Sender<([f32; TILE_COUNT * 5], Option<f32>)>) {
+    let mut trainer = Trainer::new(tiler, |e| {
+        e.map(|p| Dual::new_full(p.get_real().min(1.).max(0.), &p.get_gradient()))
+    }, ());
     tx.send((trainer.get_model_params(), None)).unwrap();
+
+       let img = ImageReader::open("assets/rust.png")
+        .unwrap()
+        .decode()
+        .unwrap();
 
     let mut dataset_complexity = 1;
 
@@ -38,15 +39,15 @@ pub fn train_thread(tx: Sender<([f32; TILE_COUNT * 2], Option<f32>)>) {
     }
 }
 
-fn dataset_provider(
-    og_img: &DynamicImage,
-    dataset_complexity: usize,
-) -> Vec<DataPoint<{ TILE_COUNT * 2 }, 2, 3>> {
+fn dataset_provider(og_img: &DynamicImage, dataset_complexity: usize)->Vec<DataPoint<{TILE_COUNT*5},2,3>> {
+ 
+
     let img = og_img
         .resize_exact(100, 100, Triangle)
-        .blur(10. / dataset_complexity as f32);
+        .blur(1. / dataset_complexity as f32);
 
-    img.pixels()
+    img
+        .pixels()
         .map(|(x, y, c)| DataPoint {
             input: [
                 x as f32 / img.dimensions().0 as f32,

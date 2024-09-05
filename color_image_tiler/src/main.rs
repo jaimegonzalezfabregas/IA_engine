@@ -15,7 +15,6 @@ extern crate vecmath;
 extern crate gfx;
 extern crate shader_version;
 
-use ::image::{GenericImageView, ImageReader};
 use stats_visualizer_thread::stats_thread;
 use training_thread::train_thread;
 
@@ -36,8 +35,7 @@ impl Vertex {
     }
 }
 
-const TILE_COUNT: usize = 100;
-const IMAGE_PATH: &str = "assets/simple.png";
+const TILE_COUNT: usize = 300;
 
 gfx_defines! {
 
@@ -126,14 +124,8 @@ fn main() {
     stats_builder.spawn(|| stats_thread(stats_rx)).unwrap();
 
 
-    let mut params = [0.; TILE_COUNT * 2];
+    let mut params = [0.; TILE_COUNT * 5];
     //println!("updated_image {params:?}");
-
-           let img = ImageReader::open(IMAGE_PATH)
-        .unwrap()
-        .decode()
-        .unwrap().resize(1000, 1000, ::image::imageops::FilterType::CatmullRom);
-
 
     let now = SystemTime::now();
     while let Some(e) = window.next() {
@@ -146,12 +138,14 @@ fn main() {
         let t = now.elapsed().unwrap().as_millis() as f32 / 1000.;
 
         let points: [[u8; 4]; TILE_COUNT] =
-            array::from_fn(|i| [as_u8(params[i * 2]), as_u8(params[i * 2 + 1]), 0, 0]);
+            array::from_fn(|i| [as_u8(params[i * 5]), as_u8(params[i * 5 + 1]), 0, 0]);
         let colors: [[u8; 4]; TILE_COUNT] = array::from_fn(|i| {
-
-            let color = img.get_pixel((params[i*2] * 999.) as u32, (params[i*2 + 1] * 999.) as u32);
-
-            color.0
+            [
+                as_u8(params[i * 5 + 2]),
+                as_u8(params[i * 5 + 3]),
+                as_u8(params[i * 5 + 4]),
+                u8::MAX,
+            ]
         });
 
         let (_, texture_view_points) = factory
