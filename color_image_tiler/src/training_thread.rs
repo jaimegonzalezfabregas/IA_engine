@@ -1,9 +1,6 @@
-use std::sync::mpsc::Sender;
+use std::{array, sync::mpsc::Sender};
 
-use ia_engine::{
-    dual::Dual,
-    trainer::{DataPoint, Trainer},
-};
+use ia_engine::trainer::{default_extra_cost, DataPoint, Trainer};
 use image::{DynamicImage, GenericImageView, ImageReader};
 use rand::seq::SliceRandom;
 
@@ -13,24 +10,12 @@ pub fn train_thread(tx: Sender<([f32; TILE_COUNT * 5], (Option<f32>, usize))>) {
     let mut rng = rand::thread_rng();
     let mut trainer = Trainer::new(
         tiler,
-        |e| e.map(|p| Dual::new_full(p.get_real().min(1.).max(0.), &p.get_gradient())),
-        |params| {
-        //    ( Dual::from(1.) / params
-        //         .array_chunks::<5>()
-        //         .flat_map(|[x1, y1, _, _, _]| {
-        //             params
-        //                 .array_chunks::<5>()
-        //                 .map(|[x, y, _, _, _]| (x1, y1, x, y))
-        //                 .collect::<Vec<_>>()
-        //         })
-        //         .fold(Dual::cero(), |acc, (x1, y1, x2, y2)| {
-        //             let dx = *x1 - *x2;
-        //             let dy = *y1 - *y2;
-        //             acc + (dx * dx) + (dy * dy)
-        //         }))*300.
-            Dual::cero()
-                
+        |params: &[f32; TILE_COUNT * 5], gradient: &[f32; TILE_COUNT * 5]| {
+            let new_params = array::from_fn(|i| params[i] + gradient[i]);
+
+            new_params.map(|p| p.min(1.).max(0.))
         },
+        default_extra_cost,
         (),
     );
     tx.send((trainer.get_model_params(), (None, 0))).unwrap();

@@ -20,7 +20,7 @@ impl<const P: usize> From<f32> for Dual<P> {
 }
 
 impl<const P: usize> Dual<P> {
-    pub fn cero() -> Self {
+    pub const fn zero() -> Self {
         Self {
             real: 0.,
             sigma: Simd::zero(),
@@ -36,14 +36,14 @@ impl<const P: usize> Dual<P> {
     }
 
     pub fn new_param(real: f32, i: usize) -> Dual<P> {
-        let mut ret = Self::cero();
+        let mut ret = Self::zero();
         ret.real = real;
         ret.sigma[i] = 1.;
         ret
     }
 
     pub fn new(real: f32) -> Self {
-        let mut ret = Self::cero();
+        let mut ret = Self::zero();
         ret.real = real;
         ret
     }

@@ -13,7 +13,7 @@ pub struct DataPoint<const P: usize, const I: usize, const O: usize> {
 
 impl<const P: usize, const I: usize, const O: usize> DataPoint<P, I, O> {
     fn cost(&self, prediction: [Dual<P>; O]) -> Dual<P> {
-        let mut ret = Dual::cero();
+        let mut ret = Dual::zero();
 
         for (pred_val, goal_val) in prediction.iter().zip(self.output.iter()) {
             let diff = *pred_val - Dual::new(*goal_val);
@@ -25,6 +25,14 @@ impl<const P: usize, const I: usize, const O: usize> DataPoint<P, I, O> {
     }
 }
 
+pub const fn default_extra_cost<const P: usize>(_: &[Dual<P>; P]) -> Dual<P> {
+    Dual::zero()
+}
+
+pub fn default_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P]) -> [f32; P] {
+    array::from_fn(|i| params[i] + vector[i])
+}
+
 pub struct Trainer<
     const P: usize,
     const I: usize,
@@ -32,13 +40,13 @@ pub struct Trainer<
     ExtraData: Sync + Clone,
     F: Fn(&[Dual<P>; P], &[Dual<P>; I], &ExtraData) -> [Dual<P>; O],
     ExtraCost: Fn(&[Dual<P>; P]) -> Dual<P>,
-    ParamTransformer: Fn(&[Dual<P>; P]) -> [Dual<P>; P],
+    ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
 > {
     model: F,
     params: [Dual<P>; P],
     last_cost: Option<Dual<P>>,
     learning_factor: f32,
-    param_transformer: ParamTransformer,
+    param_translator: ParamTranslate,
     extra_cost: ExtraCost,
     extra_data: ExtraData,
 }
@@ -50,8 +58,8 @@ impl<
         ExtraData: Sync + Clone,
         F: Fn(&[Dual<P>; P], &[Dual<P>; I], &ExtraData) -> [Dual<P>; O] + Sync,
         ExtraCost: Fn(&[Dual<P>; P]) -> Dual<P>,
-        ParamTransformer: Fn(&[Dual<P>; P]) -> [Dual<P>; P],
-    > Trainer<P, I, O, ExtraData, F, ExtraCost, ParamTransformer>
+        ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
+    > Trainer<P, I, O, ExtraData, F, ExtraCost, ParamTranslate>
 {
     pub fn get_model_params(&self) -> [f32; P] {
         self.params.map(|e| e.get_real())
@@ -76,10 +84,16 @@ impl<
 
                 case_cost / dataset.len() as f32
             })
-            .reduce(|| Dual::cero(), |acc, cost| acc + cost) + (self.extra_cost)(&params)
+            .reduce(|| Dual::zero(), |acc, cost| acc + cost)
+            + (&self.extra_cost)(&params)
     }
 
-    pub fn new(trainable: F, param_transformer: ParamTransformer, extra_cost: ExtraCost, extra_data: ExtraData) -> Self {
+    pub fn new(
+        trainable: F,
+        param_translator: ParamTranslate,
+        extra_cost: ExtraCost,
+        extra_data: ExtraData,
+    ) -> Self {
         rayon::ThreadPoolBuilder::new()
             .stack_size(1 * 1024 * 1024 * 1024)
             .build_global()
@@ -92,7 +106,7 @@ impl<
             params: array::from_fn(|i| Dual::new_param(rng.gen(), i)),
             last_cost: None,
             learning_factor: 1.,
-            param_transformer,
+            param_translator,
             extra_cost,
             extra_data,
         }
@@ -124,9 +138,12 @@ impl<
         let mut learning_factor = self.learning_factor;
 
         while self.last_cost.unwrap().get_real() >= cost_to_beat {
-            self.params = (self.param_transformer)(&array::from_fn(|i| {
-                Dual::new_param(og_parameters[i] - unit_gradient[i] * learning_factor, i)
-            }));
+            let gradient = unit_gradient.map(|e| -e * learning_factor);
+
+            let new_params = (self.param_translator)(&og_parameters, &gradient);
+
+            self.params = array::from_fn(|i| Dual::new_param(new_params[i], i));
+
             self.last_cost = Some(self.cost(dataset));
             // println!(
             //     "    improvement: {learning_factor} {}",
@@ -135,7 +152,7 @@ impl<
 
             learning_factor /= 2.;
 
-            if learning_factor.abs() < 0.00001 {
+            if learning_factor.abs() < 0.0000001 {
                 self.learning_factor = 1.0;
                 // self.last_cost = None;
                 return false;
