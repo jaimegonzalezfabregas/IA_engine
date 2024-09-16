@@ -29,26 +29,29 @@ pub struct Trainer<
     const P: usize,
     const I: usize,
     const O: usize,
-    E: Sync + Clone,
-    F: Fn(&[Dual<P>; P], &[Dual<P>; I], &E) -> [Dual<P>; O],
-    G: Fn(&[Dual<P>; P]) -> [Dual<P>; P],
+    ExtraData: Sync + Clone,
+    F: Fn(&[Dual<P>; P], &[Dual<P>; I], &ExtraData) -> [Dual<P>; O],
+    ExtraCost: Fn(&[Dual<P>; P]) -> Dual<P>,
+    ParamTransformer: Fn(&[Dual<P>; P]) -> [Dual<P>; P],
 > {
     model: F,
     params: [Dual<P>; P],
     last_cost: Option<Dual<P>>,
     learning_factor: f32,
-    param_transformer: G,
-    extra: E
+    param_transformer: ParamTransformer,
+    extra_cost: ExtraCost,
+    extra_data: ExtraData,
 }
 
 impl<
         const P: usize,
         const I: usize,
         const O: usize,
-        E: Sync + Clone,
-        F: Fn(&[Dual<P>; P], &[Dual<P>; I], &E) -> [Dual<P>; O] + Sync,
-        G: Fn(&[Dual<P>; P]) -> [Dual<P>; P],
-    > Trainer<P, I, O, E, F, G>
+        ExtraData: Sync + Clone,
+        F: Fn(&[Dual<P>; P], &[Dual<P>; I], &ExtraData) -> [Dual<P>; O] + Sync,
+        ExtraCost: Fn(&[Dual<P>; P]) -> Dual<P>,
+        ParamTransformer: Fn(&[Dual<P>; P]) -> [Dual<P>; P],
+    > Trainer<P, I, O, ExtraData, F, ExtraCost, ParamTransformer>
 {
     pub fn get_model_params(&self) -> [f32; P] {
         self.params.map(|e| e.get_real())
@@ -61,7 +64,7 @@ impl<
     fn cost(&self, dataset: &Vec<DataPoint<P, I, O>>) -> Dual<P> {
         let params = &self.params;
         let model = &self.model;
-        let extra = self.extra.clone();
+        let extra = self.extra_data.clone();
 
         dataset
             .par_iter()
@@ -73,10 +76,10 @@ impl<
 
                 case_cost / dataset.len() as f32
             })
-            .reduce(|| Dual::cero(), |acc, cost| acc + cost)
+            .reduce(|| Dual::cero(), |acc, cost| acc + cost) + (self.extra_cost)(&params)
     }
 
-    pub fn new(trainable: F, param_transformer: G, extra: E) -> Self {
+    pub fn new(trainable: F, param_transformer: ParamTransformer, extra_cost: ExtraCost, extra_data: ExtraData) -> Self {
         rayon::ThreadPoolBuilder::new()
             .stack_size(1 * 1024 * 1024 * 1024)
             .build_global()
@@ -84,14 +87,14 @@ impl<
 
         let mut rng = rand::thread_rng();
 
-
         Self {
             model: trainable,
             params: array::from_fn(|i| Dual::new_param(rng.gen(), i)),
             last_cost: None,
             learning_factor: 1.,
             param_transformer,
-            extra
+            extra_cost,
+            extra_data,
         }
     }
 
@@ -109,7 +112,12 @@ impl<
 
         //  println!("unit_gradient: {:?}", unit_gradient);
 
-        assert_eq!(false, unit_gradient.iter().fold(false, |acc, x| acc || !x.is_finite()));
+        assert_eq!(
+            false,
+            unit_gradient
+                .iter()
+                .fold(false, |acc, x| acc || !x.is_finite())
+        );
 
         let cost_to_beat = cost.get_real();
 

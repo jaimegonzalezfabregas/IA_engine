@@ -4,50 +4,75 @@ use ia_engine::{
     dual::Dual,
     trainer::{DataPoint, Trainer},
 };
-use image::{imageops::FilterType::Triangle, DynamicImage, GenericImageView, ImageReader};
-
+use image::{DynamicImage, GenericImageView, ImageReader};
+use rand::seq::SliceRandom;
 
 use crate::{tiler, TILE_COUNT};
 
-pub fn train_thread(tx: Sender<([f32; TILE_COUNT * 5], Option<f32>)>) {
-    let mut trainer = Trainer::new(tiler, |e| {
-        e.map(|p| Dual::new_full(p.get_real().min(1.).max(0.), &p.get_gradient()))
-    }, ());
-    tx.send((trainer.get_model_params(), None)).unwrap();
+pub fn train_thread(tx: Sender<([f32; TILE_COUNT * 5], (Option<f32>, usize))>) {
+    let mut rng = rand::thread_rng();
+    let mut trainer = Trainer::new(
+        tiler,
+        |e| e.map(|p| Dual::new_full(p.get_real().min(1.).max(0.), &p.get_gradient())),
+        |params| {
+        //    ( Dual::from(1.) / params
+        //         .array_chunks::<5>()
+        //         .flat_map(|[x1, y1, _, _, _]| {
+        //             params
+        //                 .array_chunks::<5>()
+        //                 .map(|[x, y, _, _, _]| (x1, y1, x, y))
+        //                 .collect::<Vec<_>>()
+        //         })
+        //         .fold(Dual::cero(), |acc, (x1, y1, x2, y2)| {
+        //             let dx = *x1 - *x2;
+        //             let dy = *y1 - *y2;
+        //             acc + (dx * dx) + (dy * dy)
+        //         }))*300.
+            Dual::cero()
+                
+        },
+        (),
+    );
+    tx.send((trainer.get_model_params(), (None, 0))).unwrap();
+    println!("read_image");
 
-       let img = ImageReader::open("assets/rust.png")
+    let img = ImageReader::open("assets/rust.png")
         .unwrap()
         .decode()
         .unwrap();
+    println!("get dataset");
 
-    let mut dataset_complexity = 1;
+    let mut pixels = dataset_provider(&img);
 
-    loop {
-        let not_reached_local_min = trainer.train_step(&dataset_provider(&img, dataset_complexity));
+    let mut local_minimum_count = 0;
+    while local_minimum_count < 100 {
+        println!("shuffling");
 
-        if !not_reached_local_min {
-            println!("complexify");
-            dataset_complexity += 1;
-        }
+        pixels.shuffle(&mut rng);
+        println!("shuffled");
 
-        tx.send((trainer.get_model_params(), trainer.get_last_cost()))
+        for semi_pixels in pixels.array_chunks::<10>() {
+            if !trainer.train_step(&Vec::from(semi_pixels)) {
+                local_minimum_count += 1;
+            } else {
+                local_minimum_count = 0;
+            }
+            tx.send((
+                trainer.get_model_params(),
+                (trainer.get_last_cost(), local_minimum_count),
+            ))
             .unwrap();
-        // for semi_pixels in pixels.array_chunks::<90>() {
-        //     println!("{:?}",semi_pixels);
-        //     trainer.train_step(&Vec::from(semi_pixels));
-        // }
+        }
     }
+
+    println!("training done");
 }
 
-fn dataset_provider(og_img: &DynamicImage, dataset_complexity: usize)->Vec<DataPoint<{TILE_COUNT*5},2,3>> {
- 
+fn dataset_provider(og_img: &DynamicImage) -> Vec<DataPoint<{ TILE_COUNT * 5 }, 2, 3>> {
+    let img = og_img; //.resize_exact(100, 100, Triangle);
+                      // .blur(1. / dataset_complexity as f32);
 
-    let img = og_img
-        .resize_exact(100, 100, Triangle)
-        .blur(1. / dataset_complexity as f32);
-
-    img
-        .pixels()
+    img.pixels()
         .map(|(x, y, c)| DataPoint {
             input: [
                 x as f32 / img.dimensions().0 as f32,

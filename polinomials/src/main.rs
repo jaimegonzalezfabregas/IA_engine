@@ -2,7 +2,7 @@ mod polinomial;
 mod piston_backend;
 
 use full_palette::GREEN_A700;
-use ia_engine::trainer::{DataPoint, Trainer};
+use ia_engine::{dual::Dual, trainer::{DataPoint, Trainer}};
 use piston_backend::draw_piston_window;
 use piston_window::{PistonWindow, WindowSettings};
 use plotters::prelude::*;
@@ -23,7 +23,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut trainer = Trainer::new(polinomial::<6,_>, |x|*x, ());
+    let mut trainer = Trainer::new(polinomial::<6,_>, |x|*x, |_| Dual::cero(), ());
 
     let mut epoch = 10;
 

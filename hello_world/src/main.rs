@@ -1,6 +1,6 @@
 #![feature(generic_arg_infer)]
 
-use ia_engine::trainer::{DataPoint, Trainer};
+use ia_engine::{dual::Dual, trainer::{DataPoint, Trainer}};
 
 fn direct<N: Copy>(parameters: &[N; 1], _: &[N; 0], _: &()) -> [N; 1] {
     *parameters
@@ -12,7 +12,7 @@ fn main() {
         output: [200.],
     }];
 
-    let mut trainer = Trainer::new(direct, |x| *x, ());
+    let mut trainer = Trainer::new(direct, |x| *x, |_| Dual::cero(), ());
 
     for _ in 0..10 {
         trainer.train_step(&dataset);

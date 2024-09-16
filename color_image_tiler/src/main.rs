@@ -35,8 +35,8 @@ impl Vertex {
     }
 }
 
-const TILE_COUNT: usize = 15;
-const TILE_BIAS: f32 = 0.1;
+const TILE_COUNT: usize = 150;
+const TILE_BIAS: f32 = 0.01;
 
 gfx_defines! {
 
@@ -66,7 +66,7 @@ fn main() {
 
     let opengl = OpenGL::V3_2;
 
-    let mut window: PistonWindow = WindowSettings::new("piston: cube", [640, 640])
+    let mut window: PistonWindow = WindowSettings::new("piston window", [640, 640])
         .exit_on_esc(true)
         .samples(4)
         .graphics_api(opengl)

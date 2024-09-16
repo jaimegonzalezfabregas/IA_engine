@@ -1,6 +1,6 @@
 mod polinomial;
 
-use ia_engine::trainer::{DataPoint, Trainer};
+use ia_engine::{dual::Dual, trainer::{DataPoint, Trainer}};
 use crate::polinomial::polinomial;
 
 fn base_func(x: f32) -> f32 {
@@ -15,7 +15,7 @@ const SPEED: isize = 100;
 fn main() {
     
 
-    let mut trainer = Trainer::new(polinomial::<6,_>, |x|*x, ());
+    let mut trainer = Trainer::new(polinomial::<6,_>, |x|*x, |_| Dual::cero(), ());
 
     let mut epoch = 10;
 

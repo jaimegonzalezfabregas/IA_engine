@@ -36,7 +36,10 @@ void main() {
         }
     }
 
-  
+    if (closest_d < 0.00001){
+         o_Color = vec4(1,0,1,1);
+         return;
+    }
 
     vec4 closest_col = vec4(texture(t_color, vec2((closest_i + 0.5)/TILE_COUNT,0)).xyz, 1);   
     vec4 second_closest_col = vec4(texture(t_color, vec2((second_closest_i + 0.5)/TILE_COUNT,0)).xyz, 1);

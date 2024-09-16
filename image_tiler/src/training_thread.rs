@@ -14,9 +14,10 @@ pub fn train_thread(tx: Sender<([f32; TILE_COUNT * 2], Option<f32>)>) {
     let mut trainer = Trainer::new(
         tiler,
         |e| e.map(|p| Dual::new_full(p.get_real().min(1.).max(0.), &p.get_gradient())),
+        |_| Dual::cero(),
         img.resize(1000, 1000, image::imageops::FilterType::CatmullRom),
     );
-    
+
     tx.send((trainer.get_model_params(), None)).unwrap();
 
     let mut dataset_complexity = 1;
