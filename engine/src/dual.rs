@@ -1,28 +1,37 @@
 mod addition;
-mod substraction;
 mod division;
 mod multiplication;
+mod substraction;
 
 use core::ops::*;
 
 use number_traits::{One, Sqrt, Zero};
 
-use crate::simd_arr::SimdArr;
+use crate::simd_arr::{DereferenceArithmetic, SimdArr};
 
 #[derive(Clone, Copy, Debug)]
 
-pub struct Dual<const P: usize, S: SimdArr<P>> {
+pub struct Dual<const P: usize, S: SimdArr<P>>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     real: f32,
     sigma: S,
 }
 
-impl<const P: usize, S: SimdArr<P>> From<f32> for Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> From<f32> for Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     fn from(value: f32) -> Self {
         Self::new(value)
     }
 }
 
-impl<const P: usize, S: SimdArr<P>> Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     pub fn new_param(real: f32, i: usize) -> Dual<P, S> {
         Self {
             real: real,
@@ -35,7 +44,10 @@ impl<const P: usize, S: SimdArr<P>> Dual<P, S> {
     }
 }
 
-impl<const P: usize, S: SimdArr<P>> Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     pub fn zero() -> Self {
         Self {
             real: 0.,
@@ -65,7 +77,10 @@ impl<const P: usize, S: SimdArr<P>> Dual<P, S> {
     }
 }
 
-impl<const P: usize, S: SimdArr<P>> Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     pub fn abs(&mut self) {
         if *self < 0. {
             self.real = -self.real;
@@ -73,35 +88,30 @@ impl<const P: usize, S: SimdArr<P>> Dual<P, S> {
     }
 }
 
-
-
-impl<const P: usize, S: SimdArr<P>> Div<Dual<P, S>> for Dual<P, S> {
-    type Output = Dual<P, S>;
-
-    fn div(self, rhs: Dual<P, S>) -> Self::Output {
-        assert_finite(Dual {
-            real: self.real / rhs.real,
-            sigma: ((self.sigma * rhs.real) - &(rhs.sigma * self.real)) / (rhs.real * rhs.real),
-        })
-    }
-}
-
-
-impl<const P: usize, S: SimdArr<P>> Neg for Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> Neg for Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     type Output = Dual<P, S>;
 
     fn neg(self) -> Self::Output {
-        self * -1.
+        &self * -1.
     }
 }
 
-impl<const P: usize, S: SimdArr<P>> PartialEq for Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> PartialEq for Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     fn eq(&self, other: &Self) -> bool {
         self.real.eq(&other.real)
     }
 }
 
-impl<const P: usize, S: SimdArr<P>> PartialOrd for Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> PartialOrd for Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.real.partial_cmp(&other.real)
     }
@@ -109,16 +119,22 @@ impl<const P: usize, S: SimdArr<P>> PartialOrd for Dual<P, S> {
 
 // extended traits for https://docs.rs/number_traits/latest/number_traits/index.html
 
-impl<const P: usize, S: SimdArr<P>> Sqrt for Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> Sqrt for Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     fn sqrt(&self) -> Self {
         assert_finite(Dual {
             real: self.real.sqrt(),
-            sigma: self.sigma / (2. * self.real.sqrt()),
+            sigma: &self.sigma / (2. * self.real.sqrt()),
         })
     }
 }
 
-impl<const P: usize, S: SimdArr<P>> Zero for Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> Zero for Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     fn zero() -> Self {
         Self {
             real: 0.,
@@ -131,7 +147,10 @@ impl<const P: usize, S: SimdArr<P>> Zero for Dual<P, S> {
     }
 }
 
-impl<const P: usize, S: SimdArr<P>> One for Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> One for Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     fn one() -> Self {
         Self {
             real: 1.,
@@ -144,27 +163,42 @@ impl<const P: usize, S: SimdArr<P>> One for Dual<P, S> {
     }
 }
 
-impl<const P: usize, S: SimdArr<P>> Eq for Dual<P, S> {}
+impl<const P: usize, S: SimdArr<P>> Eq for Dual<P, S> where
+    for<'own> &'own S: DereferenceArithmetic<S>
+{
+}
 
-impl<const P: usize, S: SimdArr<P>> PartialEq<f32> for Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> PartialEq<f32> for Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     fn eq(&self, other: &f32) -> bool {
         self.real.eq(other)
     }
 }
 
-impl<const P: usize, S: SimdArr<P>> PartialOrd<f32> for Dual<P, S> {
+impl<const P: usize, S: SimdArr<P>> PartialOrd<f32> for Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     fn partial_cmp(&self, other: &f32) -> Option<std::cmp::Ordering> {
         self.real.partial_cmp(other)
     }
 }
 
-impl<const P: usize, S: SimdArr<P>> From<Dual<P, S>> for f32 {
+impl<const P: usize, S: SimdArr<P>> From<Dual<P, S>> for f32
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     fn from(value: Dual<P, S>) -> Self {
         value.get_real()
     }
 }
 
-const fn assert_finite<const P: usize, S: SimdArr<P>>(a: Dual<P, S>) -> Dual<P, S> {
+const fn assert_finite<const P: usize, S: SimdArr<P>>(a: Dual<P, S>) -> Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     // assert!(a.get_real().is_finite());
     // assert!(a
     //     .get_gradient()

@@ -9,24 +9,27 @@ use crate::{TILE_BIAS, TILE_COUNT};
 pub fn tiler<
     N: Copy
         + From<f32>
-        + Sub<Output = N>
-        + Add<Output = N>
-        + Mul<Output = N>
-        + Div<Output = N>
         + Sqrt
         + Zero
         + One
         + Debug
         + Neg<Output = N>
         + PartialOrd<f32>
-        + PartialOrd<N>
-        + Sub<f32, Output = N>
-        + Div<f32, Output = N>
-        + Add<f32, Output = N>,
+        + PartialOrd<N>,
 >(
     params: &[N; TILE_COUNT * 5],
-    input: &[N; 2], _:&()
-) -> [N; 3] {
+    input: &[N; 2],
+    _: &(),
+) -> [N; 3]
+where
+    for<'own, 'a, 'b, 'c, 'd> &'own N: Sub<f32, Output = N>
+        + Div<f32, Output = N>
+        + Add<f32, Output = N>
+        + Sub<&'a N, Output = N>
+        + Add<&'b N, Output = N>
+        + Mul<&'c N, Output = N>
+        + Div<&'d N, Output = N>,
+{
     let cells: Vec<_> = params.array_chunks::<5>().collect();
 
     let mut closest_d = N::from(1.);
@@ -37,10 +40,10 @@ pub fn tiler<
     for i in 0..TILE_COUNT {
         let [x, y, _, _, _] = *cells[i];
 
-        let x_d = x - input[0];
-        let y_d = y - input[1];
+        let x_d = &x - &input[0];
+        let y_d = &y - &input[1];
 
-        let d_2 = (x_d * x_d) + (y_d * y_d);
+        let d_2 = &(&x_d * &x_d) + &(&y_d * &y_d);
 
         if closest_d > d_2 {
             second_closest_d = closest_d;
@@ -59,27 +62,26 @@ pub fn tiler<
     if closest_d < TILE_BIAS {
         [closest_r, closest_b, closest_g]
     } else {
-
         let [_, _, second_closest_r, second_closest_g, second_closest_b] = *cells[second_closest_i];
 
-        let half_r = closest_r + second_closest_r / 2.;
-        let half_g = closest_g + second_closest_g / 2.;
-        let half_b = closest_b + second_closest_b / 2.;
+        let half_r = &closest_r + &(&second_closest_r / 2.);
+        let half_g = &closest_g + &(&second_closest_g / 2.);
+        let half_b = &closest_b + &(&second_closest_b / 2.);
 
-        let mix_factor = closest_d / second_closest_d;
+        let mix_factor = &closest_d / &second_closest_d;
 
         let biased_mix_factor = if mix_factor < TILE_BIAS {
             N::zero()
-        }else{
-            (mix_factor -TILE_BIAS) / (1. - TILE_BIAS)
+        } else {
+            &(&mix_factor - TILE_BIAS) / (1. - TILE_BIAS)
         };
 
-        let anti_biased_mix_factor = - biased_mix_factor + 1.;
+        let anti_biased_mix_factor = &-biased_mix_factor + 1.;
 
         [
-            closest_r * anti_biased_mix_factor + half_r * biased_mix_factor,
-            closest_g * anti_biased_mix_factor + half_g * biased_mix_factor,
-            closest_b * anti_biased_mix_factor + half_b * biased_mix_factor,
+            &(&closest_r * &anti_biased_mix_factor) + &(&half_r * &biased_mix_factor),
+            &(&closest_g * &anti_biased_mix_factor) + &(&half_g * &biased_mix_factor),
+            &(&closest_b * &anti_biased_mix_factor) + &(&half_b * &biased_mix_factor),
         ]
     }
 }

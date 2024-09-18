@@ -1,12 +1,16 @@
 use std::ops::{Add, Div, Index, IndexMut, Mul, Sub};
 
-use super::SimdArr;
+use super::{DereferenceArithmetic, SimdArr};
 
 #[derive(Clone, Copy, Debug)]
 pub struct DenseSimd<const S: usize> {
     data: [f32; S],
 }
-impl<const S: usize> SimdArr<S> for DenseSimd<S> {
+
+impl<const S: usize> DereferenceArithmetic<DenseSimd<S>> for &DenseSimd<S> {}
+
+impl<const S: usize> SimdArr<S> for DenseSimd<S>
+{
     fn new_from_array(data: &[f32; S]) -> DenseSimd<S> {
         Self { data: *data }
     }
@@ -79,11 +83,12 @@ impl<const S: usize> Sub<&DenseSimd<S>> for &DenseSimd<S> {
     }
 }
 
-impl<const S: usize> Mul<f32> for DenseSimd<S> {
+impl<const S: usize> Mul<f32> for &DenseSimd<S> {
     type Output = DenseSimd<S>;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        let mut ret = Self { data: [0.; S] };
+        let mut ret = DenseSimd { data: [0.; S] };
+
         for (i, a) in self.data.into_iter().enumerate() {
             ret.data[i] = a * rhs;
         }
@@ -91,11 +96,12 @@ impl<const S: usize> Mul<f32> for DenseSimd<S> {
     }
 }
 
-impl<const S: usize> Div<f32> for DenseSimd<S> {
-    type Output = Self;
+impl<const S: usize> Div<f32> for &DenseSimd<S> {
+    type Output = DenseSimd<S>;
 
     fn div(self, rhs: f32) -> Self::Output {
-        let mut ret = Self { data: [0.; S] };
+        let mut ret = DenseSimd { data: [0.; S] };
+
         for (i, a) in self.data.into_iter().enumerate() {
             ret.data[i] = a / rhs;
         }

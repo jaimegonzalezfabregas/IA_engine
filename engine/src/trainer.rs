@@ -1,7 +1,8 @@
 use std::array;
+use std::ops::{Add, Div, Mul, Sub};
 
 use crate::dual::Dual;
-use crate::simd_arr::SimdArr;
+use crate::simd_arr::{DereferenceArithmetic, SimdArr};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rayon::iter::IntoParallelRefIterator;
@@ -14,20 +15,26 @@ pub struct DataPoint<const P: usize, const I: usize, const O: usize> {
 }
 
 impl<const P: usize, const I: usize, const O: usize> DataPoint<P, I, O> {
-    fn cost<S: SimdArr<P>>(&self, prediction: [Dual<P, S>; O]) -> Dual<P, S> {
+    fn cost<S: SimdArr<P>>(&self, prediction: [Dual<P, S>; O]) -> Dual<P, S>
+    where
+        for<'own> &'own S: DereferenceArithmetic<S>,
+    {
         let mut ret = Dual::zero();
 
         for (pred_val, goal_val) in prediction.iter().zip(self.output.iter()) {
             let mut diff = pred_val - &Dual::new(*goal_val);
             diff.abs();
-            ret += diff / 2.;
+            ret += &diff / 2.;
         }
 
         ret
     }
 }
 
-pub fn default_extra_cost<const P: usize, S: SimdArr<P>>(_: &[Dual<P, S>; P]) -> Dual<P, S> {
+pub fn default_extra_cost<const P: usize, S: SimdArr<P>>(_: &[Dual<P, S>; P]) -> Dual<P, S>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     Dual::zero()
 }
 
@@ -44,11 +51,11 @@ pub struct Trainer<
     F: Fn(&[Dual<P, S>; P], &[Dual<P, S>; I], &ExtraData) -> [Dual<P, S>; O],
     ExtraCost: Fn(&[Dual<P, S>; P]) -> Dual<P, S>,
     ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
-> {
+> where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     model: F,
     params: [Dual<P, S>; P],
-    last_cost: Option<Dual<P, S>>,
-    learning_factor: f32,
     param_translator: ParamTranslate,
     extra_cost: ExtraCost,
     extra_data: ExtraData,
@@ -74,13 +81,11 @@ impl<
         ExtraCost: Fn(&[Dual<P, S>; P]) -> Dual<P, S>,
         ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
     > Trainer<P, I, O, ExtraData, S, F, ExtraCost, ParamTranslate>
+where
+    for<'own> &'own S: DereferenceArithmetic<S>,
 {
     pub fn get_model_params(&self) -> [f32; P] {
-        self.params.map(|e| e.get_real())
-    }
-
-    pub fn get_last_cost(&self) -> Option<f32> {
-        self.last_cost.map(|e| e.get_real())
+        self.params.clone().map(|e| e.get_real())
     }
 
     fn cost(&self, dataset: &Vec<DataPoint<P, I, O>>) -> Dual<P, S> {
@@ -96,7 +101,7 @@ impl<
 
                 let case_cost = data_point.cost(prediction);
 
-                case_cost / dataset.len() as f32
+                &case_cost / dataset.len() as f32
             })
             .reduce(|| Dual::zero(), |acc, cost| acc + cost)
             + (&self.extra_cost)(&params)
@@ -118,8 +123,6 @@ impl<
         Self {
             model: trainable,
             params: array::from_fn(|i| Dual::new_param(rng.gen(), i)),
-            last_cost: None,
-            learning_factor: 1.,
             param_translator,
             extra_cost,
             extra_data,
@@ -129,14 +132,10 @@ impl<
     // TODO return a proper error when NaN apears
 
     pub fn train_step(&mut self, dataset: &Vec<DataPoint<P, I, O>>) -> bool {
-        let cost = match self.last_cost {
-            None => self.cost(dataset),
-            Some(c) => c,
-        };
-        self.last_cost = Some(cost);
+        let cost = self.cost(dataset);
 
-        let unit_gradient = self.last_cost.unwrap().get_gradient();
-        let og_parameters = self.params.map(|e| e.get_real());
+        let unit_gradient = cost.get_gradient();
+        let og_parameters = array::from_fn(|i| self.params[i].get_real());
 
         // assert_eq!(
         //     false,
@@ -152,9 +151,6 @@ impl<
         for (i, param) in new_params.iter().enumerate() {
             self.params[i].set_real(*param);
         }
-
-        self.last_cost = Some(self.cost(dataset));
-        
 
         return true;
     }

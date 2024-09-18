@@ -3,7 +3,7 @@ use std::{
     ops::{Add, Div, Index, IndexMut, Mul, Sub},
 };
 
-use super::SimdArr;
+use super::{DereferenceArithmetic, SimdArr};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SparseSimd<const S: usize> {
@@ -16,6 +16,8 @@ impl<const S: usize> SparseSimd<S> {
         self.size
     }
 }
+
+impl<const S: usize> DereferenceArithmetic<SparseSimd<S>> for &SparseSimd<S> {}
 
 impl<const S: usize> SimdArr<S> for SparseSimd<S> {
     fn zero() -> SparseSimd<S> {
@@ -209,25 +211,29 @@ impl<const S: usize> Sub<&SparseSimd<S>> for &SparseSimd<S> {
     }
 }
 
-impl<const S: usize> Mul<f32> for SparseSimd<S> {
-    type Output = Self;
+impl<const S: usize> Mul<f32> for &SparseSimd<S> {
+    type Output = SparseSimd<S>;
 
-    fn mul(mut self, rhs: f32) -> Self::Output {
+    fn mul(self, rhs: f32) -> Self::Output {
+        let mut ret = *self;
+
         for i in 0..self.size {
-            self.data[i] = self.data[i] * rhs;
+            ret.data[i] = self.data[i] * rhs;
         }
-        self
+        ret
     }
 }
 
-impl<const S: usize> Div<f32> for SparseSimd<S> {
-    type Output = Self;
+impl<const S: usize> Div<f32> for &SparseSimd<S> {
+    type Output = SparseSimd<S>;
 
-    fn div(mut self, rhs: f32) -> Self::Output {
+    fn div(self, rhs: f32) -> Self::Output {
+        let mut ret = *self;
+
         for i in 0..self.size {
-            self.data[i] = self.data[i] / rhs;
+            ret.data[i] = self.data[i] / rhs;
         }
-        self
+        ret
     }
 }
 
@@ -315,13 +321,13 @@ mod tests {
     fn test_mul_scalar<const N: usize>(a: [f32; N], b: f32) {
         let res = a.map(|a_elm| a_elm * b);
 
-        assert_eq!((SparseSimd::new_from_array(&a) * b).to_array(), res)
+        assert_eq!((&SparseSimd::new_from_array(&a) * b).to_array(), res)
     }
 
     fn test_div_scalar<const N: usize>(a: [f32; N], b: f32) {
         let res = a.map(|a_elm| a_elm / b);
 
-        assert_eq!((SparseSimd::new_from_array(&a) / b).to_array(), res)
+        assert_eq!((&SparseSimd::new_from_array(&a) / b).to_array(), res)
     }
 
     #[test]

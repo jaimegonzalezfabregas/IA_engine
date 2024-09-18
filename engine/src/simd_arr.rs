@@ -1,6 +1,6 @@
 use std::{
     fmt::Debug,
-    ops::{Add, Div, Index, IndexMut, Mul, Neg, Sub},
+    ops::{Add, Div, Index, IndexMut, Mul, Sub},
 };
 
 pub mod dense_simd;
@@ -9,15 +9,16 @@ pub mod sparse_simd;
 
 pub trait SimdArr<const S: usize>:
     Debug
+    + Sized
     + Send
     + Sync
-    + Mul<f32, Output = Self>
-    + Div<f32, Output = Self>
     + Index<usize, Output = f32>
     + IndexMut<usize, Output = f32>
+    + for<'a> Add<&'a Self, Output = Self>
+    + for<'b> Sub<&'b Self, Output = Self>
+    + Clone
 where
-    for<'a, 'b> Self: Add<&'a Self, Output = Self> + Sub<&'b Self, Output = Self>,
-    for<'a, 'b, 'c> &'c Self: Add<&'a Self, Output = Self> + Sub<&'b Self, Output = Self>,
+    for<'own> &'own Self: DereferenceArithmetic<Self>,
 {
     fn new_from_array(seed: &[f32; S]) -> Self;
 
@@ -26,4 +27,12 @@ where
     fn zero() -> Self;
 
     fn to_array(&self) -> [f32; S];
+}
+
+pub trait DereferenceArithmetic<In>:
+    for<'a> Add<&'a In, Output = In>
+    + for<'b> Sub<&'b In, Output = In>
+    + Mul<f32, Output = In>
+    + Div<f32, Output = In>
+{
 }

@@ -1,11 +1,7 @@
-use std::{
-    array,
-    fs::OpenOptions,
-    sync::mpsc::Sender,
-};
+use std::{array, fs::OpenOptions, sync::mpsc::Sender};
 
 use ia_engine::{
-    simd_arr::{dense_simd::DenseSimd, hybrid_simd::HybridSimd, SimdArr},
+    simd_arr::{dense_simd::DenseSimd, hybrid_simd::HybridSimd, DereferenceArithmetic, SimdArr},
     trainer::{default_extra_cost, DataPoint, Trainer},
 };
 use image::{DynamicImage, GenericImageView, ImageReader};
@@ -129,7 +125,9 @@ pub fn train_thread(
 fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
     tx: Option<Sender<TrainerComunicationCodes<([f32; TILE_COUNT * 5], (Option<f32>, usize))>>>,
     max_iterations: Option<usize>,
-) {
+) where
+    for<'own> &'own S: DereferenceArithmetic<S>,
+{
     let mut rng = ChaCha8Rng::seed_from_u64(2);
     let mut trainer: Trainer<_, _, _, _, S, _, _, _> =
         Trainer::new(tiler, max_speed_param_translator, default_extra_cost, ());
