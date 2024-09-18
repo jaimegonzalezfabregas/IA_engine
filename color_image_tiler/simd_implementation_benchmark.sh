@@ -1,0 +1,15 @@
+RUSTFLAGS=-Awarnings time cargo run --release -- 0
+RUSTFLAGS=-Awarnings time cargo run --release -- 1
+RUSTFLAGS=-Awarnings time cargo run --release -- 2
+RUSTFLAGS=-Awarnings time cargo run --release -- 3
+RUSTFLAGS=-Awarnings time cargo run --release -- 4
+RUSTFLAGS=-Awarnings time cargo run --release -- 6
+RUSTFLAGS=-Awarnings time cargo run --release -- 8
+RUSTFLAGS=-Awarnings time cargo run --release -- 10
+RUSTFLAGS=-Awarnings time cargo run --release -- 20
+RUSTFLAGS=-Awarnings time cargo run --release -- 30
+RUSTFLAGS=-Awarnings time cargo run --release -- 50
+RUSTFLAGS=-Awarnings time cargo run --release -- 70
+RUSTFLAGS=-Awarnings time cargo run --release -- 90
+RUSTFLAGS=-Awarnings time cargo run --release -- 150
+RUSTFLAGS=-Awarnings time cargo run --release -- 300

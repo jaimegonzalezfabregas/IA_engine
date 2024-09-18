@@ -4,13 +4,7 @@
 			"path": "engine"
 		},
 		{
-			"path": "polinomials"
-		},
-		{
 			"path": "color_image_tiler"
-		},
-		{
-			"path": "hello_world"
 		}
 	],
 	"settings": {

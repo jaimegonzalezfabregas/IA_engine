@@ -36,7 +36,7 @@ void main() {
         }
     }
 
-    if (closest_d < 0.00001){
+    if (abs(sqrt(closest_d) - 0.003) < 0.002){
          o_Color = vec4(1,0,1,1);
          return;
     }

@@ -1,4 +1,6 @@
 #![feature(array_chunks)]
+#![feature(generic_arg_infer)]
+#![feature(test)]
 
 mod stats_visualizer_thread;
 mod tiler;
@@ -8,9 +10,7 @@ use std::{array, sync::mpsc::channel, thread, time::SystemTime};
 
 use crate::tiler::tiler;
 
-extern crate camera_controllers;
 extern crate piston_window;
-extern crate vecmath;
 #[macro_use]
 extern crate gfx;
 extern crate shader_version;
@@ -35,8 +35,8 @@ impl Vertex {
     }
 }
 
-const TILE_COUNT: usize = 150;
-const TILE_BIAS: f32 = 0.01;
+const TILE_COUNT: usize = 300;
+const TILE_BIAS: f32 = 0.;
 
 gfx_defines! {
 
@@ -56,6 +56,11 @@ gfx_defines! {
 
 fn as_u8(i: f32) -> u8 {
     (u8::MAX as f32 * i) as u8
+}
+
+pub enum TrainerComunicationCodes<T> {
+    Die,
+    Msg(T),
 }
 
 fn main() {
@@ -120,7 +125,9 @@ fn main() {
 
     let stats_builder = thread::Builder::new().name("stats_thread".into());
 
-    train_builder.spawn(|| train_thread(train_tx)).unwrap();
+    train_builder
+        .spawn(|| train_thread(train_tx, Some(1000)))
+        .unwrap();
     stats_builder.spawn(|| stats_thread(stats_rx)).unwrap();
 
     let mut params = [0.; TILE_COUNT * 5];
@@ -128,11 +135,15 @@ fn main() {
 
     let now = SystemTime::now();
     while let Some(e) = window.next() {
-        while let Ok((new_params, cost)) = train_rx.try_recv() {
-            params = new_params;
-            stats_tx.send(cost).unwrap();
-            // println!("{params:?}");
-        }
+        while match train_rx.try_recv() {
+            Ok(TrainerComunicationCodes::Die) => return,
+            Ok(TrainerComunicationCodes::Msg((new_params, cost))) => {
+                params = new_params;
+                stats_tx.send(cost).unwrap();
+                true
+            }
+            Err(_) => false,
+        } {}
 
         let t = now.elapsed().unwrap().as_millis() as f32 / 1000.;
 
@@ -189,3 +200,4 @@ fn main() {
         });
     }
 }
+

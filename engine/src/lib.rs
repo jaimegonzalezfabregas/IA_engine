@@ -1,9 +1,8 @@
 #![feature(portable_simd)]
 #![feature(array_chunks)]
+#![feature(let_chains)]
 
-mod dense_simd;
 pub mod dual;
-mod sparse_simd;
 pub mod trainer;
-mod hybrid_simd;
+pub mod simd_arr;
 

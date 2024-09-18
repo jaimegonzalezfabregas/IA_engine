@@ -89,6 +89,7 @@ dependencies = [
  "indicatif",
  "number_traits",
  "rand",
+ "rand_chacha",
  "rayon",
 ]
 

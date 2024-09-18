@@ -10,3 +10,4 @@ rand = "0.8.5"
 number_traits = "0.2.4"
 rayon = "1.10.0"
 indicatif = {version = "*", features = ["rayon"]}
+rand_chacha = "0.3.1"

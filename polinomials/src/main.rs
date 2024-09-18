@@ -1,8 +1,10 @@
+#![feature(generic_arg_infer)]
+
 mod polinomial;
 mod piston_backend;
 
 use full_palette::GREEN_A700;
-use ia_engine::trainer::{default_extra_cost, default_param_translator, DataPoint, Trainer};
+use ia_engine::{simd_arr::dense_simd::DenseSimd, trainer::{default_extra_cost, default_param_translator, DataPoint, Trainer}};
 use piston_backend::draw_piston_window;
 use piston_window::{PistonWindow, WindowSettings};
 use plotters::prelude::*;
@@ -23,7 +25,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut trainer = Trainer::new(polinomial::<6,_>, default_param_translator, default_extra_cost, ());
+    let mut trainer: Trainer<_, _, _, _, DenseSimd<_>, _, _, _> = Trainer::new(polinomial::<6,_>, default_param_translator, default_extra_cost, ());
 
     let mut epoch = 10;
 
