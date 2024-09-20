@@ -1,14 +1,12 @@
 use std::ops::{Add, Div, Index, IndexMut, Mul, Sub};
 
-use super::{dense_simd::DenseSimd, sparse_simd::SparseSimd, DereferenceArithmetic, SimdArr};
+use super::{dense_simd::DenseSimd, sparse_simd::SparseSimd, SimdArr};
 
 #[derive(Clone, Copy, Debug)]
 pub enum HybridSimd<const SIZE: usize, const CRITIALITY: usize> {
     Dense(DenseSimd<SIZE>),
-    Sparse(SparseSimd<SIZE>),
+    Sparse(SparseSimd<CRITIALITY, SIZE>),
 }
-
-impl<const S: usize, const C: usize> DereferenceArithmetic<HybridSimd<S, C>> for &HybridSimd<S, C> {}
 
 impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
     fn new_from_array(arr: &[f32; S]) -> Self {
@@ -40,6 +38,29 @@ impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
     fn new_from_value_and_pos(val: f32, pos: usize) -> Self {
         HybridSimd::Sparse(SparseSimd::new_from_value_and_pos(val, pos))
     }
+
+    fn acumulate(&mut self, rhs: &Self) {
+        match (&mut self, rhs) {
+            (HybridSimd::Dense(a), HybridSimd::Dense(b)) => a.acumulate(b),
+            (HybridSimd::Dense(a), HybridSimd::Sparse(b)) => a.acumulate(b),
+            (HybridSimd::Sparse(ref b), HybridSimd::Dense(a)) => 
+            (HybridSimd::Sparse(a), HybridSimd::Sparse(b)) => {
+                let sparse_result = *a + b;
+                if sparse_result.non_zero_count() > C {
+                    HybridSimd::Sparse(sparse_result)
+                } else {
+                    HybridSimd::Dense(DenseSimd::new_from_array(&sparse_result.to_array()))
+                }
+            }
+        }
+    }
+
+    fn multiply(&mut self, rhs: f32) {
+        match self {
+            HybridSimd::Dense(d) => d.multiply(rhs),
+            HybridSimd::Sparse(s) => s.multiply(rhs),
+        }
+    }
 }
 
 impl<const S: usize, const C: usize> Index<usize> for HybridSimd<S, C> {
@@ -58,68 +79,6 @@ impl<const S: usize, const C: usize> IndexMut<usize> for HybridSimd<S, C> {
         match self {
             HybridSimd::Dense(d) => &mut d[index],
             HybridSimd::Sparse(s) => &mut s[index],
-        }
-    }
-}
-
-impl<const S: usize, const C: usize> Add<&HybridSimd<S, C>> for HybridSimd<S, C> {
-    type Output = HybridSimd<S, C>;
-
-    fn add(self, rhs: &HybridSimd<S, C>) -> Self::Output {
-        &self + rhs
-    }
-}
-
-impl<const S: usize, const C: usize> Sub<&HybridSimd<S, C>> for HybridSimd<S, C> {
-    type Output = HybridSimd<S, C>;
-
-    fn sub(self, rhs: &HybridSimd<S, C>) -> Self::Output {
-        &self - rhs
-    }
-}
-
-impl<const S: usize, const C: usize> Add<&HybridSimd<S, C>> for &HybridSimd<S, C> {
-    type Output = HybridSimd<S, C>;
-
-    fn add(self, rhs: &HybridSimd<S, C>) -> HybridSimd<S, C> {
-        match (&self, rhs) {
-            (HybridSimd::Dense(a), HybridSimd::Dense(b)) => HybridSimd::Dense(*a + b),
-            (HybridSimd::Dense(a), HybridSimd::Sparse(ref b))
-            | (HybridSimd::Sparse(ref b), HybridSimd::Dense(a)) => {
-                HybridSimd::Dense(DenseSimd::new_from_array(&b.to_array()) + a)
-            }
-            (HybridSimd::Sparse(a), HybridSimd::Sparse(b)) => {
-                let sparse_result = *a + b;
-                if sparse_result.non_zero_count() > C {
-                    HybridSimd::Sparse(sparse_result)
-                } else {
-                    HybridSimd::Dense(DenseSimd::new_from_array(&sparse_result.to_array()))
-                }
-            }
-        }
-    }
-}
-
-impl<const S: usize, const C: usize> Sub<&HybridSimd<S, C>> for &HybridSimd<S, C> {
-    type Output = HybridSimd<S, C>;
-
-    fn sub(self, rhs: &HybridSimd<S, C>) -> Self::Output {
-        match (self, rhs) {
-            (HybridSimd::Dense(a), HybridSimd::Dense(b)) => HybridSimd::Dense(a - b),
-            (HybridSimd::Dense(a), HybridSimd::Sparse(b)) => {
-                HybridSimd::Dense(a - &DenseSimd::new_from_array(&b.to_array()))
-            }
-            (HybridSimd::Sparse(b), HybridSimd::Dense(a)) => {
-                HybridSimd::Dense(DenseSimd::new_from_array(&b.to_array()) - a)
-            }
-            (HybridSimd::Sparse(a), HybridSimd::Sparse(b)) => {
-                let sparse_result = *a - b;
-                if sparse_result.non_zero_count() > C {
-                    HybridSimd::Sparse(sparse_result)
-                } else {
-                    HybridSimd::Dense(DenseSimd::new_from_array(&sparse_result.to_array()))
-                }
-            }
         }
     }
 }

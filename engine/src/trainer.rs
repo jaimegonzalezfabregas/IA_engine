@@ -1,7 +1,7 @@
 use std::array;
 
 use crate::dual::Dual;
-use crate::simd_arr::{DereferenceArithmetic, SimdArr};
+use crate::simd_arr::SimdArr;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rayon::iter::IntoParallelRefIterator;
@@ -15,8 +15,6 @@ pub struct DataPoint<const P: usize, const I: usize, const O: usize> {
 
 impl<const P: usize, const I: usize, const O: usize> DataPoint<P, I, O> {
     fn cost<S: SimdArr<P>>(&self, prediction: [Dual<P, S>; O]) -> Dual<P, S>
-    where
-        for<'own> &'own S: DereferenceArithmetic<S>,
     {
         let mut ret = Dual::zero();
 
@@ -32,8 +30,6 @@ impl<const P: usize, const I: usize, const O: usize> DataPoint<P, I, O> {
 }
 
 pub fn default_extra_cost<const P: usize, S: SimdArr<P>>(_: &[Dual<P, S>; P]) -> Dual<P, S>
-where
-    for<'own> &'own S: DereferenceArithmetic<S>,
 {
     Dual::zero()
 }
@@ -51,8 +47,7 @@ pub struct Trainer<
     F: Fn(&[Dual<P, S>; P], &[Dual<P, S>; I], &ExtraData) -> [Dual<P, S>; O],
     ExtraCost: Fn(&[Dual<P, S>; P]) -> Dual<P, S>,
     ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
-> where
-    for<'own> &'own S: DereferenceArithmetic<S>,
+> 
 {
     model: F,
     params: [Dual<P, S>; P],
@@ -81,8 +76,7 @@ impl<
         ExtraCost: Fn(&[Dual<P, S>; P]) -> Dual<P, S>,
         ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
     > Trainer<P, I, O, ExtraData, S, F, ExtraCost, ParamTranslate>
-where
-    for<'own> &'own S: DereferenceArithmetic<S>,
+
 {
     pub fn get_model_params(&self) -> [f32; P] {
         self.params.clone().map(|e| e.get_real())
@@ -144,14 +138,25 @@ where
         //         .fold(false, |acc, x| acc || !x.is_finite())
         // );
 
-        let gradient = unit_gradient.map(|e| -e);
+        let mut factor = 2.;
 
-        let new_params = (self.param_translator)(&og_parameters, &gradient);
+        while {
+            let gradient = unit_gradient.map(|e| -e * factor);
 
-        for (i, param) in new_params.iter().enumerate() {
-            self.params[i].set_real(*param);
+            let new_params = (self.param_translator)(&og_parameters, &gradient);
+
+            for (i, param) in new_params.iter().enumerate() {
+                self.params[i].set_real(*param);
+            }
+
+            self.cost(dataset) > cost
+        } {
+            factor /= 2.;
+
+            if factor < 0.0001 {
+                return false;
+            }
         }
-
         return true;
     }
 

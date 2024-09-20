@@ -14,11 +14,7 @@ pub trait SimdArr<const S: usize>:
     + Sync
     + Index<usize, Output = f32>
     + IndexMut<usize, Output = f32>
-    + for<'a> Add<&'a Self, Output = Self>
-    + for<'b> Sub<&'b Self, Output = Self>
     + Clone
-where
-    for<'own> &'own Self: DereferenceArithmetic<Self>,
 {
     fn new_from_array(seed: &[f32; S]) -> Self;
 
@@ -29,12 +25,8 @@ where
     fn neg(&mut self);
 
     fn to_array(&self) -> [f32; S];
-}
 
-pub trait DereferenceArithmetic<In>:
-    for<'a> Add<&'a In, Output = In>
-    + for<'b> Sub<&'b In, Output = In>
-    + Mul<f32, Output = In>
-    + Div<f32, Output = In>
-{
+    fn acumulate<RHS: SimdArr<S>>(&mut self, rhs: &RHS);
+
+    fn multiply(&mut self, rhs: f32);
 }

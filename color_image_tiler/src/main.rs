@@ -35,8 +35,8 @@ impl Vertex {
     }
 }
 
-const TILE_COUNT: usize = 500;
-const TILE_BIAS: f32 = 0.5;
+const TILE_COUNT: usize = 300;
+const TILE_BIAS: f32 = 0.95;
 
 gfx_defines! {
 
@@ -126,7 +126,7 @@ fn main() {
     let stats_builder = thread::Builder::new().name("stats_thread".into());
 
     train_builder
-        .spawn(|| train_thread(train_tx, None))
+        .spawn(|| train_thread(train_tx, Some(100)))
         .unwrap();
     stats_builder.spawn(|| stats_thread(stats_rx)).unwrap();
 

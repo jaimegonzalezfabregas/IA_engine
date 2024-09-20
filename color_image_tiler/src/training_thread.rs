@@ -1,8 +1,8 @@
-use std::{array, fs::OpenOptions, sync::mpsc::Sender};
+use std::{array, sync::mpsc::Sender};
 
 use ia_engine::{
     dual::Dual,
-    simd_arr::{dense_simd::DenseSimd, hybrid_simd::HybridSimd, DereferenceArithmetic, SimdArr},
+    simd_arr::{hybrid_simd::HybridSimd, DereferenceArithmetic, SimdArr},
     trainer::{default_extra_cost, DataPoint, Trainer},
 };
 use image::{DynamicImage, GenericImageView, ImageReader};
@@ -10,6 +10,8 @@ use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 use crate::{tiler, TrainerComunicationCodes, TILE_COUNT};
+
+/* 
 fn enforce_separation(
     p1: (f32, f32),
     p1_old: (f32, f32),
@@ -65,14 +67,6 @@ fn enforce_separation(
     ret
 }
 
-fn max_speed_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P]) -> [f32; P] {
-    let ret = array::from_fn(|i| match i % 5 {
-        0 | 1 => ((params[i] + vector[i].max(-0.03).min(0.03)) + 1.) % 1.,
-        _ => params[i] + vector[i],
-    });
-
-    ret
-}
 
 fn colision_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P]) -> [f32; P] {
     let mut rng = ChaCha8Rng::seed_from_u64(2);
@@ -114,22 +108,30 @@ fn colision_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P
 
     new_params
 }
+*/
 
-use std::io::Write;
+
+fn max_speed_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P]) -> [f32; P] {
+    let ret = array::from_fn(|i| match i % 5 {
+        0 | 1 => ((params[i] + vector[i].max(-0.003).min(0.003)) + 1.) % 1.,
+        _ => params[i] + vector[i],
+    });
+
+    ret
+}
 
 pub fn train_thread(
     tx: Sender<TrainerComunicationCodes<([f32; TILE_COUNT * 5], (Option<f32>, usize))>>,
     max_iterations: Option<usize>,
 ) {
-    train_work::<HybridSimd<_, 10>>(Some(tx), max_iterations);
+    train_work::<HybridSimd<_, 1>>(Some(tx), max_iterations);
     // train_work::<DenseSimd<_>>(Some(tx), max_iterations);
 }
 
 fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
     tx: Option<Sender<TrainerComunicationCodes<([f32; TILE_COUNT * 5], (Option<f32>, usize))>>>,
     max_iterations: Option<usize>,
-) where
-    for<'own> &'own S: DereferenceArithmetic<S>,
+) 
 {
     let mut rng = ChaCha8Rng::seed_from_u64(2);
     let mut trainer: Trainer<_, _, _, _, S, _, _, _> = Trainer::new(
@@ -146,13 +148,6 @@ fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
         .unwrap();
     }
 
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open("params_history")
-        .unwrap();
-
     let img = ImageReader::open(
         "/home/jaime/Desktop/projects/IA_engine/color_image_tiler/assets/rust.png",
     )
@@ -168,8 +163,9 @@ fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
     while local_minimum_count < 100 {
         pixels.shuffle(&mut rng);
 
-        for semi_pixels in pixels.array_chunks::<7>() {
+        for semi_pixels in pixels.array_chunks::<30>() {
             iterations += 1;
+            println!("it {}", iterations);
 
             if max_iterations
                 .map(|max_it| iterations >= max_it)
@@ -193,8 +189,6 @@ fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
                     (trainer.get_last_cost(), local_minimum_count),
                 )))
                 .unwrap();
-
-                // writeln!(file, "{:?}", trainer.get_model_params()).unwrap();
             }
         }
     }
@@ -234,7 +228,7 @@ mod tests {
     use super::test::Bencher;
 
     use ia_engine::simd_arr::{
-        dense_simd::DenseSimd, hybrid_simd::HybridSimd, sparse_simd::SparseSimd,
+        dense_simd::DenseSimd, hybrid_simd::HybridSimd,
         DereferenceArithmetic, SimdArr,
     };
 
@@ -248,7 +242,7 @@ mod tests {
             .name("train_thread".into())
             .stack_size(2 * 1024 * 1024 * 1024);
 
-        train_builder
+        let _ = train_builder
             .spawn(|| train_work::<S>(None, Some(100)))
             .unwrap()
             .join();
@@ -257,10 +251,6 @@ mod tests {
     #[bench]
     fn bench_dense(b: &mut Bencher) {
         b.iter(|| bench::<DenseSimd<_>>());
-    }
-    #[bench]
-    fn bench_sparse(b: &mut Bencher) {
-        b.iter(|| bench::<SparseSimd<_>>());
     }
     #[bench]
     fn bench_hybrid_0(b: &mut Bencher) {
