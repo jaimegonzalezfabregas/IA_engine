@@ -8,11 +8,9 @@ pub enum HybridSimd<const SIZE: usize, const CRITIALITY: usize> {
     Sparse(SparseSimd<SIZE>),
 }
 
-impl<const S: usize, const C: usize> DereferenceArithmetic<HybridSimd<S, C>> for &HybridSimd<S, C>{}
+impl<const S: usize, const C: usize> DereferenceArithmetic<HybridSimd<S, C>> for &HybridSimd<S, C> {}
 
-
-impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C>
-{
+impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
     fn new_from_array(arr: &[f32; S]) -> Self {
         if arr.iter().filter(|e| **e == 0.).count() > C {
             Self::Sparse(SparseSimd::new_from_array(arr))
@@ -29,6 +27,13 @@ impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C>
         match self {
             HybridSimd::Dense(d) => d.to_array(),
             HybridSimd::Sparse(s) => s.to_array(),
+        }
+    }
+
+    fn neg(&mut self) {
+        match self {
+            HybridSimd::Dense(d) => d.neg(),
+            HybridSimd::Sparse(s) => s.neg(),
         }
     }
 
@@ -57,8 +62,7 @@ impl<const S: usize, const C: usize> IndexMut<usize> for HybridSimd<S, C> {
     }
 }
 
-impl<const S: usize, const C: usize> Add<&HybridSimd<S, C>> for HybridSimd<S, C>
-{
+impl<const S: usize, const C: usize> Add<&HybridSimd<S, C>> for HybridSimd<S, C> {
     type Output = HybridSimd<S, C>;
 
     fn add(self, rhs: &HybridSimd<S, C>) -> Self::Output {
@@ -66,8 +70,7 @@ impl<const S: usize, const C: usize> Add<&HybridSimd<S, C>> for HybridSimd<S, C>
     }
 }
 
-impl<const S: usize, const C: usize> Sub<&HybridSimd<S, C>> for HybridSimd<S, C>
-{
+impl<const S: usize, const C: usize> Sub<&HybridSimd<S, C>> for HybridSimd<S, C> {
     type Output = HybridSimd<S, C>;
 
     fn sub(self, rhs: &HybridSimd<S, C>) -> Self::Output {
@@ -75,8 +78,7 @@ impl<const S: usize, const C: usize> Sub<&HybridSimd<S, C>> for HybridSimd<S, C>
     }
 }
 
-impl<const S: usize, const C: usize> Add<&HybridSimd<S, C>> for &HybridSimd<S, C>
-{
+impl<const S: usize, const C: usize> Add<&HybridSimd<S, C>> for &HybridSimd<S, C> {
     type Output = HybridSimd<S, C>;
 
     fn add(self, rhs: &HybridSimd<S, C>) -> HybridSimd<S, C> {
@@ -98,8 +100,7 @@ impl<const S: usize, const C: usize> Add<&HybridSimd<S, C>> for &HybridSimd<S, C
     }
 }
 
-impl<const S: usize, const C: usize> Sub<&HybridSimd<S, C>> for &HybridSimd<S, C>
-{
+impl<const S: usize, const C: usize> Sub<&HybridSimd<S, C>> for &HybridSimd<S, C> {
     type Output = HybridSimd<S, C>;
 
     fn sub(self, rhs: &HybridSimd<S, C>) -> Self::Output {

@@ -26,6 +26,8 @@ where
 
     fn zero() -> Self;
 
+    fn neg(&mut self);
+
     fn to_array(&self) -> [f32; S];
 }
 

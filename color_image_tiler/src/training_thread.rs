@@ -1,6 +1,7 @@
 use std::{array, fs::OpenOptions, sync::mpsc::Sender};
 
 use ia_engine::{
+    dual::Dual,
     simd_arr::{dense_simd::DenseSimd, hybrid_simd::HybridSimd, DereferenceArithmetic, SimdArr},
     trainer::{default_extra_cost, DataPoint, Trainer},
 };
@@ -65,10 +66,12 @@ fn enforce_separation(
 }
 
 fn max_speed_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P]) -> [f32; P] {
-    array::from_fn(|i| match i % 5 {
-        0 | 1 => params[i] + vector[i].max(-0.02).min(0.02),
+    let ret = array::from_fn(|i| match i % 5 {
+        0 | 1 => ((params[i] + vector[i].max(-0.03).min(0.03)) + 1.) % 1.,
         _ => params[i] + vector[i],
-    })
+    });
+
+    ret
 }
 
 fn colision_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P]) -> [f32; P] {
@@ -129,8 +132,12 @@ fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
     for<'own> &'own S: DereferenceArithmetic<S>,
 {
     let mut rng = ChaCha8Rng::seed_from_u64(2);
-    let mut trainer: Trainer<_, _, _, _, S, _, _, _> =
-        Trainer::new(tiler, max_speed_param_translator, default_extra_cost, ());
+    let mut trainer: Trainer<_, _, _, _, S, _, _, _> = Trainer::new(
+        tiler::<Dual<_, _>>,
+        max_speed_param_translator,
+        default_extra_cost,
+        (),
+    );
     if let Some(ref tx) = tx {
         tx.send(TrainerComunicationCodes::Msg((
             trainer.get_model_params(),
@@ -227,18 +234,22 @@ mod tests {
     use super::test::Bencher;
 
     use ia_engine::simd_arr::{
-        dense_simd::DenseSimd, hybrid_simd::HybridSimd, sparse_simd::SparseSimd, SimdArr,
+        dense_simd::DenseSimd, hybrid_simd::HybridSimd, sparse_simd::SparseSimd,
+        DereferenceArithmetic, SimdArr,
     };
 
     use super::train_work;
 
-    fn bench<S: SimdArr<{ TILE_COUNT * 5 }>>() {
+    fn bench<S: SimdArr<{ TILE_COUNT * 5 }>>()
+    where
+        for<'own> &'own S: DereferenceArithmetic<S>,
+    {
         let train_builder = thread::Builder::new()
             .name("train_thread".into())
             .stack_size(2 * 1024 * 1024 * 1024);
 
         train_builder
-            .spawn(|| train_work::<S>(None, Some(1000)))
+            .spawn(|| train_work::<S>(None, Some(100)))
             .unwrap()
             .join();
     }

@@ -1,5 +1,4 @@
 use std::array;
-use std::ops::{Add, Div, Mul, Sub};
 
 use crate::dual::Dual;
 use crate::simd_arr::{DereferenceArithmetic, SimdArr};
@@ -21,10 +20,11 @@ impl<const P: usize, const I: usize, const O: usize> DataPoint<P, I, O> {
     {
         let mut ret = Dual::zero();
 
-        for (pred_val, goal_val) in prediction.iter().zip(self.output.iter()) {
+        for (pred_val, goal_val) in prediction.into_iter().zip(self.output.iter()) {
             let mut diff = pred_val - &Dual::new(*goal_val);
             diff.abs();
-            ret += &diff / 2.;
+
+            ret = ret + &(diff / 2.);
         }
 
         ret
@@ -93,7 +93,7 @@ where
         let model = &self.model;
         let extra = self.extra_data.clone();
 
-        dataset
+        &dataset
             .par_iter()
             // .progress_count(dataset.len() as u64)
             .map(|data_point| {
@@ -101,10 +101,10 @@ where
 
                 let case_cost = data_point.cost(prediction);
 
-                &case_cost / dataset.len() as f32
+                case_cost / dataset.len() as f32
             })
-            .reduce(|| Dual::zero(), |acc, cost| acc + cost)
-            + (&self.extra_cost)(&params)
+            .reduce(|| Dual::zero(), |acc, cost| &acc + &cost)
+            + &(&self.extra_cost)(&params)
     }
 
     pub fn new(
@@ -153,5 +153,9 @@ where
         }
 
         return true;
+    }
+
+    pub fn get_last_cost(&self) -> Option<f32> {
+        None
     }
 }

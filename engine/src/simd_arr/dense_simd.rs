@@ -9,8 +9,7 @@ pub struct DenseSimd<const S: usize> {
 
 impl<const S: usize> DereferenceArithmetic<DenseSimd<S>> for &DenseSimd<S> {}
 
-impl<const S: usize> SimdArr<S> for DenseSimd<S>
-{
+impl<const S: usize> SimdArr<S> for DenseSimd<S> {
     fn new_from_array(data: &[f32; S]) -> DenseSimd<S> {
         Self { data: *data }
     }
@@ -27,6 +26,12 @@ impl<const S: usize> SimdArr<S> for DenseSimd<S>
         let mut ret = Self { data: [0.; S] };
         ret.data[pos] = val;
         ret
+    }
+
+    fn neg(&mut self) {
+        for i in 0..S {
+            self.data[i] *= -1.;
+        }
     }
 }
 

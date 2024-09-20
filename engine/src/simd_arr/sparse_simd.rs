@@ -71,6 +71,12 @@ impl<const S: usize> SimdArr<S> for SparseSimd<S> {
         ret.data[0] = val;
         ret
     }
+
+    fn neg(&mut self) {
+        for i in 0..self.size {
+            self.data[i] *= -1.;
+        }
+    }
 }
 
 impl<const S: usize> Index<usize> for SparseSimd<S> {

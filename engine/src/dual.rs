@@ -9,7 +9,7 @@ use number_traits::{One, Sqrt, Zero};
 
 use crate::simd_arr::{DereferenceArithmetic, SimdArr};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 
 pub struct Dual<const P: usize, S: SimdArr<P>>
 where
@@ -82,8 +82,9 @@ where
     for<'own> &'own S: DereferenceArithmetic<S>,
 {
     pub fn abs(&mut self) {
-        if *self < 0. {
+        if self.real < 0. {
             self.real = -self.real;
+            self.sigma.neg();
         }
     }
 }
@@ -95,7 +96,7 @@ where
     type Output = Dual<P, S>;
 
     fn neg(self) -> Self::Output {
-        &self * -1.
+        self * -1.
     }
 }
 

@@ -35,8 +35,8 @@ impl Vertex {
     }
 }
 
-const TILE_COUNT: usize = 300;
-const TILE_BIAS: f32 = 0.;
+const TILE_COUNT: usize = 500;
+const TILE_BIAS: f32 = 0.5;
 
 gfx_defines! {
 
@@ -98,14 +98,14 @@ fn main() {
     let pso = factory
         .create_pipeline_simple(
             Shaders::new()
-                .set(GLSL::V1_50, &include_str!("../assets/cube_150.glslv"))
+                .set(GLSL::V1_50, &include_str!("../assets/cube_150.glsl"))
                 .get(glsl)
                 .unwrap()
                 .as_bytes(),
             Shaders::new()
                 .set(
                     GLSL::V1_50,
-                    &include_str!("../assets/cube_150_soft.glslf")
+                    &include_str!("../assets/cube_150_soft.glsl")
                         .replace("TILE_COUNT", &format!("{TILE_COUNT}"))
                         .replace("TILE_BIAS", &format!("{TILE_BIAS}")),
                 )
@@ -126,7 +126,7 @@ fn main() {
     let stats_builder = thread::Builder::new().name("stats_thread".into());
 
     train_builder
-        .spawn(|| train_thread(train_tx, Some(1000)))
+        .spawn(|| train_thread(train_tx, None))
         .unwrap();
     stats_builder.spawn(|| stats_thread(stats_rx)).unwrap();
 
