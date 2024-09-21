@@ -8,10 +8,6 @@ pub struct DenseSimd<const S: usize> {
 }
 
 impl<const S: usize> SimdArr<S> for DenseSimd<S> {
-    fn new_from_array(data: &[f32; S]) -> DenseSimd<S> {
-        Self { data: *data }
-    }
-
     fn zero() -> DenseSimd<S> {
         Self { data: [0.; S] }
     }
@@ -26,13 +22,14 @@ impl<const S: usize> SimdArr<S> for DenseSimd<S> {
         ret
     }
 
-    fn neg(&mut self) {
+    fn neg(mut self) -> Self{
         for i in 0..S {
             self.data[i] *= -1.;
         }
+        self
     }
 
-    fn acumulate<RHS: SimdArr<S>>(&mut self, rhs: &RHS) {
+    fn acumulate(&mut self, rhs: &Self) {
         for i in 0..S {
             self.data[i] += rhs[i];
         }
@@ -43,8 +40,11 @@ impl<const S: usize> SimdArr<S> for DenseSimd<S> {
             *x *= rhs;
         }
     }
-}
 
+    fn new_from_array(data: [f32; S]) -> DenseSimd<S> {
+        Self { data }
+    }
+}
 impl<const S: usize> Index<usize> for DenseSimd<S> {
     type Output = f32;
     fn index(&self, index: usize) -> &Self::Output {

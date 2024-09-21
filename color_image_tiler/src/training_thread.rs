@@ -2,7 +2,7 @@ use std::{array, sync::mpsc::Sender};
 
 use ia_engine::{
     dual::Dual,
-    simd_arr::{hybrid_simd::HybridSimd, DereferenceArithmetic, SimdArr},
+    simd_arr::{hybrid_simd::HybridSimd, SimdArr},
     trainer::{default_extra_cost, DataPoint, Trainer},
 };
 use image::{DynamicImage, GenericImageView, ImageReader};
@@ -229,14 +229,12 @@ mod tests {
 
     use ia_engine::simd_arr::{
         dense_simd::DenseSimd, hybrid_simd::HybridSimd,
-        DereferenceArithmetic, SimdArr,
+        SimdArr,
     };
 
     use super::train_work;
 
     fn bench<S: SimdArr<{ TILE_COUNT * 5 }>>()
-    where
-        for<'own> &'own S: DereferenceArithmetic<S>,
     {
         let train_builder = thread::Builder::new()
             .name("train_thread".into())
