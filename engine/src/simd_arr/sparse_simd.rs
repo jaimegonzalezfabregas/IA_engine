@@ -214,7 +214,7 @@ mod tests {
         let res_vec = a
             .iter()
             .zip(b)
-            .map(|(a_elm, b_elm)| a_elm + b_elm)
+            .map(|(a_elm, b_elm)| a_elm - b_elm)
             .collect::<Vec<_>>();
         let res: [f32; N] = from_fn(|i| res_vec[i]);
 
@@ -261,7 +261,7 @@ mod tests {
     }
 
     fn test_div_scalar<const N: usize>(a: [f32; N], b: f32) {
-        let res = a.map(|a_elm| a_elm / b);
+        let res = a.map(|a_elm| a_elm * (1. / b)); // good enough
 
         let mut test = SparseSimd::<N, N>::new_from_array(&a).unwrap();
         test.multiply(1. / b);

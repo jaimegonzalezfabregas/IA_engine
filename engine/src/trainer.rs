@@ -18,7 +18,7 @@ impl<const P: usize, const I: usize, const O: usize> DataPoint<P, I, O> {
         let mut ret = Dual::zero();
 
         for (mut pred_val, goal_val) in prediction.into_iter().zip(self.output.iter()) {
-            pred_val = pred_val -*goal_val;
+            pred_val = pred_val - *goal_val;
 
             ret = ret + pred_val.abs();
         }
@@ -41,7 +41,7 @@ pub struct Trainer<
     const O: usize,
     ExtraData: Sync + Clone,
     S: SimdArr<P>,
-    F: Fn(&[Dual<P, S>; P], &[Dual<P, S>; I], &ExtraData) -> [Dual<P, S>; O],
+    F: Fn(&[Dual<P, S>; P], &[f32; I], &ExtraData) -> [Dual<P, S>; O] + Sync,
     ExtraCost: Fn(&[Dual<P, S>; P]) -> Dual<P, S>,
     ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
 > {
@@ -58,7 +58,7 @@ impl<
         const O: usize,
         ExtraData: Sync + Clone,
         S: SimdArr<P>,
-        F: Fn(&[Dual<P, S>; P], &[Dual<P, S>; I], &ExtraData) -> [Dual<P, S>; O] + Sync,
+        F: Fn(&[Dual<P, S>; P], &[f32; I], &ExtraData) -> [Dual<P, S>; O] + Sync,
         ExtraCost: Fn(&[Dual<P, S>; P]) -> Dual<P, S>,
         ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
     > Trainer<P, I, O, ExtraData, S, F, ExtraCost, ParamTranslate>
@@ -77,7 +77,7 @@ impl<
             .par_iter()
             // .progress_count(dataset.len() as u64)
             .map(|data_point| {
-                let prediction = (model)(&params, &data_point.input.map(|e| Dual::new(e)), &extra);
+                let prediction = (model)(&params, &data_point.input, &extra);
 
                 data_point.cost(prediction)
             })

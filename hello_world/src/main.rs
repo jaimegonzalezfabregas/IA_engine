@@ -2,7 +2,7 @@
 
 use ia_engine::{simd_arr::dense_simd::DenseSimd, trainer::{default_extra_cost, default_param_translator, DataPoint, Trainer}};
 
-fn direct<N: Clone>(parameters: &[N; 1], _: &[N; 0], _: &()) -> [N; 1] {
+fn direct<N: Clone>(parameters: &[N; 1], _: &[f32; 0], _: &()) -> [N; 1] {
     parameters.clone()
 }
 

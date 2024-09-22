@@ -5,7 +5,7 @@ pub fn polinomial<
     N: Clone + From<f32> + PartialOrd<f32> + PartialOrd<N> + Add<N, Output = N> + Mul<N, Output = N>,
 >(
     params: &[N; G],
-    input: &[N; 1],
+    input: &[f32; 1],
     _: &(),
 ) -> [N; 1] {
     let mut ret = N::from(0.);
@@ -14,7 +14,7 @@ pub fn polinomial<
     for n in 0..G {
         ret = ret + (x_to_the_nth.clone() * params[n].clone());
 
-        x_to_the_nth = x_to_the_nth * input[0].clone();
+        x_to_the_nth = x_to_the_nth * input[0];
     }
 
     [ret]

@@ -23,7 +23,7 @@ pub fn tiler<
         + ExtendedArithmetic,
 >(
     params: &[N; TILE_COUNT * 5],
-    input: &[N; 2],
+    input: &[f32; 2],
     _: &(),
 ) -> [N; 3] {
     let cells: Vec<_> = params.array_chunks::<5>().collect();
@@ -39,8 +39,8 @@ pub fn tiler<
         for i in 0..TILE_COUNT {
             let [x, y, _, _, _] = cells[i];
 
-            let x_d = x.clone() - input[0].clone() + offset[0];
-            let y_d = y.clone() - input[1].clone() + offset[1];
+            let x_d = x.clone() - input[0] + offset[0];
+            let y_d = y.clone() - input[1] + offset[1];
 
             let d_2 = x_d.pow2() + y_d.pow2();
 
