@@ -24,5 +24,3 @@ pub trait SimdArr<const S: usize>:
 
     fn multiply(&mut self, rhs: f32);
 }
-
-

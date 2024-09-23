@@ -22,7 +22,7 @@ impl<const S: usize> SimdArr<S> for DenseSimd<S> {
         ret
     }
 
-    fn neg(mut self) -> Self{
+    fn neg(mut self) -> Self {
         for i in 0..S {
             self.data[i] *= -1.;
         }

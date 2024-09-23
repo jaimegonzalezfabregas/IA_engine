@@ -1,7 +1,8 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use ia_engine::dual::ExtendedArithmetic;
 use std::fmt::Debug;
+
+use ia_engine::dual::extended_arithmetic::ExtendedArithmetic;
 
 use crate::{TILE_BIAS, TILE_COUNT};
 
@@ -64,8 +65,8 @@ pub fn tiler<
     if mix_factor < TILE_BIAS {
         [closest_r.clone(), closest_b.clone(), closest_g.clone()]
     } else {
-        let [_, _, second_closest_r, second_closest_g, second_closest_b] = cells[second_closest_i].clone();
-
+        let [_, _, second_closest_r, second_closest_g, second_closest_b] =
+            cells[second_closest_i].clone();
 
         let biased_mix_factor = if mix_factor < TILE_BIAS {
             N::from(0.)
@@ -76,8 +77,10 @@ pub fn tiler<
         let anti_biased_mix_factor = N::from(1.) - biased_mix_factor.clone();
 
         [
-            (closest_r * anti_biased_mix_factor.clone()) + (second_closest_r * biased_mix_factor.clone()),
-            (closest_g * anti_biased_mix_factor.clone()) + (second_closest_g * biased_mix_factor.clone()),
+            (closest_r * anti_biased_mix_factor.clone())
+                + (second_closest_r * biased_mix_factor.clone()),
+            (closest_g * anti_biased_mix_factor.clone())
+                + (second_closest_g * biased_mix_factor.clone()),
             (closest_b * anti_biased_mix_factor) + (second_closest_b * biased_mix_factor),
         ]
     }

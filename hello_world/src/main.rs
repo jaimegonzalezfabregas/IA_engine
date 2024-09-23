@@ -1,6 +1,9 @@
 #![feature(generic_arg_infer)]
 
-use ia_engine::{simd_arr::dense_simd::DenseSimd, trainer::{default_extra_cost, default_param_translator, DataPoint, Trainer}};
+use ia_engine::{
+    simd_arr::dense_simd::DenseSimd,
+    trainer::{default_param_translator, DataPoint, Trainer},
+};
 
 fn direct<N: Clone>(parameters: &[N; 1], _: &[f32; 0], _: &()) -> [N; 1] {
     parameters.clone()
@@ -9,14 +12,14 @@ fn direct<N: Clone>(parameters: &[N; 1], _: &[f32; 0], _: &()) -> [N; 1] {
 fn main() {
     let dataset = vec![DataPoint {
         input: [],
-        output: [200.],
+        output: [-200.],
     }];
 
     let mut trainer: Trainer<_, _, _, _, DenseSimd<_>, _, _, _> =
-        Trainer::new(direct, default_param_translator, default_extra_cost, ());
+        Trainer::new(direct, direct, default_param_translator, ());
 
-    for _ in 0..1000 {
-        trainer.train_step(&dataset);
+    while trainer.train_step(&dataset) {
         println!("{:?}", trainer.get_model_params());
     }
+    println!("{:?}", trainer.get_model_params());
 }

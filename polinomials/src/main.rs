@@ -4,7 +4,7 @@ mod polinomial;
 mod piston_backend;
 
 use full_palette::GREEN_A700;
-use ia_engine::{simd_arr::dense_simd::DenseSimd, trainer::{default_extra_cost, default_param_translator, DataPoint, Trainer}};
+use ia_engine::{simd_arr::dense_simd::DenseSimd, trainer::{default_param_translator, DataPoint, Trainer}};
 use piston_backend::draw_piston_window;
 use piston_window::{PistonWindow, WindowSettings};
 use plotters::prelude::*;
@@ -17,6 +17,7 @@ fn base_func(x: f32) -> f32 {
         + -11.
 }
 
+
 const SPEED: isize = 100;
 
 fn main() {
@@ -25,21 +26,24 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut trainer: Trainer<_, _, _, _, DenseSimd<_>, _, _, _> = Trainer::new(polinomial::<6,_>, default_param_translator, default_extra_cost, ());
+    let mut trainer: Trainer<_, _, _, _, DenseSimd<_>, _, _, _> = Trainer::new(polinomial::<6,_>, polinomial::<6,_>, default_param_translator, ());
 
     let mut epoch = 10;
 
     while let Some(_) = draw_piston_window(&mut window, |b|  {
         for _ in 0..1000 {
+
             let done = trainer.train_step(&dataset_service(epoch));
             if !done {
                 epoch += 1;
                 break;
             }
+
         }
 
         let params = trainer.get_model_params();
-        // println!("{:?}", params);
+
+        println!("{params:?}");
 
         let root = b.into_drawing_area();
         root.fill(&WHITE)?;
@@ -113,4 +117,5 @@ fn dataset_service<const P: usize>(epoch: isize) -> Vec<DataPoint<P, 1, 1>> {
             output: [base_func(x)],
         })
         .collect::<Vec<_>>()
-}
+
+    }

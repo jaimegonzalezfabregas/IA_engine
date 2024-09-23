@@ -166,12 +166,12 @@ impl<const CAPACITY: usize, const VIRTUALSIZE: usize> IndexMut<usize>
 }
 
 #[cfg(test)]
-mod tests {
-    use rand::{self, seq::SliceRandom, SeedableRng};
+mod sparse_simd_tests {
+    use rand::{self, seq::SliceRandom, Rng, SeedableRng};
     use rand_chacha::ChaCha8Rng;
     use std::array::from_fn;
 
-    use crate::simd_arr::{sparse_simd::SparseSimd};
+    use crate::simd_arr::sparse_simd::SparseSimd;
 
     #[test]
     fn test_create() {
@@ -228,8 +228,10 @@ mod tests {
 
     #[test]
     fn arithmetic_stress_test() {
+        let mut rng = ChaCha8Rng::seed_from_u64(2);
+
         for _ in 0..1000 {
-            let cero_ratio: f32 = rand::random();
+            let cero_ratio: f32 = rng.gen();
             let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
             let b: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
 
@@ -240,8 +242,10 @@ mod tests {
 
     #[test]
     fn consistency_stress_test() {
+        let mut rng = ChaCha8Rng::seed_from_u64(2);
+
         for _ in 0..1000 {
-            let cero_ratio: f32 = rand::random();
+            let cero_ratio: f32 = rng.gen();
             let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
 
             assert_eq!(
@@ -271,10 +275,12 @@ mod tests {
 
     #[test]
     fn stress_test_scalar() {
+        let mut rng = ChaCha8Rng::seed_from_u64(2);
+
         for _ in 0..1000 {
-            let cero_ratio: f32 = rand::random();
+            let cero_ratio: f32 = rng.gen();
             let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
-            let b = rand::random();
+            let b = rng.gen();
             test_mul_scalar(a, b);
             test_div_scalar(a, b);
         }
@@ -303,7 +309,7 @@ mod tests {
     fn stress_test_to_array() {
         let mut rng = ChaCha8Rng::seed_from_u64(2);
         for _ in 0..1000 {
-            let cero_ratio: f32 = rand::random();
+            let cero_ratio: f32 = rng.gen();
             let a: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
 
             let mut x: SparseSimd<4, 4> = SparseSimd::zero();
@@ -311,7 +317,6 @@ mod tests {
             order.shuffle(&mut rng);
             for i in order {
                 x[i] = a[i];
-                println!("{:?} -> {:?}", x, x.to_array());
                 assert_eq!(x.to_array()[i], a[i]);
             }
 
@@ -325,7 +330,7 @@ mod tests {
     fn stress_test_to_array_overriding() {
         let mut rng = ChaCha8Rng::seed_from_u64(2);
         for _ in 0..1000 {
-            let cero_ratio: f32 = rand::random();
+            let cero_ratio: f32 = rng.gen();
             let a: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
             let b: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
 
@@ -347,7 +352,7 @@ mod tests {
     fn stress_test_indexing() {
         let mut rng = ChaCha8Rng::seed_from_u64(2);
         for _ in 0..1000 {
-            let cero_ratio: f32 = rand::random();
+            let cero_ratio: f32 = rng.gen();
             let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
             let b: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
 

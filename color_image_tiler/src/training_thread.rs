@@ -1,9 +1,8 @@
 use std::{array, sync::mpsc::Sender};
 
 use ia_engine::{
-    dual::Dual,
     simd_arr::{hybrid_simd::HybridSimd, SimdArr},
-    trainer::{default_extra_cost, DataPoint, Trainer},
+    trainer::{DataPoint, Trainer},
 };
 use image::{DynamicImage, GenericImageView, ImageReader};
 use rand::{seq::SliceRandom, SeedableRng};
@@ -124,7 +123,7 @@ pub fn train_thread(
     tx: Sender<TrainerComunicationCodes<([f32; TILE_COUNT * 5], (Option<f32>, usize))>>,
     max_iterations: Option<usize>,
 ) {
-    train_work::<HybridSimd<_, 1>>(Some(tx), max_iterations);
+    train_work::<HybridSimd<_, {TILE_COUNT * 2}>>(Some(tx), max_iterations);
     // train_work::<DenseSimd<_>>(Some(tx), max_iterations);
 }
 
@@ -135,9 +134,9 @@ fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
 {
     let mut rng = ChaCha8Rng::seed_from_u64(2);
     let mut trainer: Trainer<_, _, _, _, S, _, _, _> = Trainer::new(
-        tiler::<Dual<_, _>>,
+        tiler,
+        tiler,
         max_speed_param_translator,
-        default_extra_cost,
         (),
     );
     if let Some(ref tx) = tx {
@@ -165,7 +164,6 @@ fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
 
         for semi_pixels in pixels.array_chunks::<30>() {
             iterations += 1;
-            println!("it {}", iterations);
 
             if max_iterations
                 .map(|max_it| iterations >= max_it)
