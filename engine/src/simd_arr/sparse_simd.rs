@@ -3,7 +3,7 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SparseSimd<const CAPACITY: usize, const VIRTUALSIZE: usize> {
     data_index: [usize; CAPACITY],
     data: [f32; CAPACITY],
@@ -81,7 +81,22 @@ impl<const CAPACITY: usize, const S: usize> SparseSimd<CAPACITY, S> {
     }
 
     pub fn acumulate(&mut self, rhs: &Self) {
-        let mut ret = SparseSimd {
+        // if rhs.size == 0 {
+        //     return;
+        // }
+
+        // if self.size == 0 {
+        //     for i in 0..rhs.size {
+        //         self.data_index[i] = rhs.data_index[i];
+        //         self.data[i] = rhs.data[i];
+        //     }
+        //     self.size = rhs.size;
+        //     return;
+        // }
+
+        println!("start acumulation with {self:?} and {rhs:?}");
+
+        let mut ret: SparseSimd<CAPACITY, S> = SparseSimd {
             data_index: [S; CAPACITY],
             data: [0.; CAPACITY],
             size: 0,
@@ -120,7 +135,15 @@ impl<const CAPACITY: usize, const S: usize> SparseSimd<CAPACITY, S> {
 
         ret.size = ret_cursor;
 
-        *self = ret
+        println!("end acumulation with {ret:?}");
+
+        println!("self before result {self:?}");
+
+        self.data = ret.data;
+        self.data_index = ret.data_index;
+        self.size = ret.size;
+
+        println!("self is now {self:?}");
     }
 
     pub fn multiply(&mut self, rhs: f32) {

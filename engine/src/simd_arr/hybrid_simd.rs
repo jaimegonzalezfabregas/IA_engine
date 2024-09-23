@@ -2,7 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use super::{dense_simd::DenseSimd, sparse_simd::SparseSimd, SimdArr};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum HybridSimd<const SIZE: usize, const CRITIALITY: usize> {
     Dense(DenseSimd<SIZE>),
     Sparse(SparseSimd<CRITIALITY, SIZE>),
@@ -39,19 +39,20 @@ impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
     }
 
     fn acumulate(&mut self, rhs: &Self) {
-        match (&self, rhs) {
-            (HybridSimd::Dense(mut a), HybridSimd::Dense(b)) => a.acumulate(b),
-            (HybridSimd::Dense(mut a), HybridSimd::Sparse(b)) => {
+        
+        match (self, rhs) {
+            (HybridSimd::Dense(a), HybridSimd::Dense(b)) => a.acumulate(b),
+            (HybridSimd::Dense(a), HybridSimd::Sparse(b)) => {
                 let transformation = DenseSimd::new_from_array(b.to_array());
                 a.acumulate(&transformation);
             }
-            (HybridSimd::Sparse(a), HybridSimd::Dense(b)) => {
+            (res @ HybridSimd::Sparse(a), HybridSimd::Dense(b)) => {
                 let mut transformation = DenseSimd::new_from_array(a.to_array());
                 transformation.acumulate(b);
 
-                *self = HybridSimd::Dense(transformation);
+                *res = HybridSimd::Dense(transformation);
             }
-            (HybridSimd::Sparse(mut a), HybridSimd::Sparse(b)) => {
+            (HybridSimd::Sparse(a), HybridSimd::Sparse(b)) => {
                 a.acumulate(b);
             }
         }

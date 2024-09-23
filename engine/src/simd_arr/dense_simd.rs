@@ -2,7 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use super::SimdArr;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct DenseSimd<const S: usize> {
     data: [f32; S],
 }

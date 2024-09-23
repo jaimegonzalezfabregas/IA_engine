@@ -8,11 +8,11 @@ impl<const P: usize, S: SimdArr<P>> Sub<Dual<P, S>> for Dual<P, S> {
     type Output = Dual<P, S>;
 
     fn sub(mut self, rhs: Dual<P, S>) -> Self::Output {
-        println!("pre sub {self:?} - {rhs:?}");
+        println!("sub start: {self:?} - {rhs:?}");
         self.real -= &rhs.real;
         self.sigma.acumulate(&rhs.sigma.neg());
+        println!("sub end sigma: {:?}", self.sigma);
 
-        println!("post sub {self:?}");
         self
     }
 }

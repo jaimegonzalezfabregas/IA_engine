@@ -61,7 +61,7 @@ fn dataset_cost<
 ) -> N {
     let mut accumulator = N::from(0.);
     let cost_list = dataset
-        .par_iter()
+        .iter()
         // .progress_count(dataset.len() as u64)
         .map(|data_point| {
             let prediction = (model)(&params, &data_point.input, &extra);
@@ -69,6 +69,7 @@ fn dataset_cost<
             datapoint_cost(data_point, prediction)
         })
         .collect::<Vec<_>>();
+
 
     for cost in cost_list {
         accumulator = accumulator + cost;
@@ -157,11 +158,11 @@ impl<
 
             let new_params = (self.param_translator)(&og_parameters, &gradient);
 
-            // println!("  gradient is : {gradient:?}, took from {og_parameters:?} to {new_params:?}");
+            println!("  gradient is : {gradient:?}, took from {og_parameters:?} to {new_params:?}");
 
             let new_cost: f32 = dataset_cost(dataset, &new_params, &self.model, &self.extra_data);
 
-            // println!("  new cost: {}, old_cost: {}", new_cost, cost.get_real());
+            println!("  new cost: {}, old_cost: {}", new_cost, cost.get_real());
 
             if new_cost > cost.get_real() {
                 true
