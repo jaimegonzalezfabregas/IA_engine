@@ -80,70 +80,75 @@ impl<const CAPACITY: usize, const S: usize> SparseSimd<CAPACITY, S> {
         self
     }
 
-    pub fn acumulate(&mut self, rhs: &Self) {
-        // if rhs.size == 0 {
-        //     return;
-        // }
+    pub fn acumulate(&mut self, rhs: &Self) -> Result<(), ()> {
+        if rhs.size == 0 {
+            Ok(())
+        } else if self.size == 0 {
+            for i in 0..rhs.size {
+                self.data_index[i] = rhs.data_index[i];
+                self.data[i] = rhs.data[i];
+            }
+            self.size = rhs.size;
+            Ok(())
+        } else {
+            let mut ret: SparseSimd<CAPACITY, S> = SparseSimd {
+                data_index: [S; CAPACITY],
+                data: [0.; CAPACITY],
+                size: 0,
+            };
 
-        // if self.size == 0 {
-        //     for i in 0..rhs.size {
-        //         self.data_index[i] = rhs.data_index[i];
-        //         self.data[i] = rhs.data[i];
-        //     }
-        //     self.size = rhs.size;
-        //     return;
-        // }
+            let mut rhs_cursor = 0;
+            let mut ret_cursor = 0;
 
-        println!("start acumulation with {self:?} and {rhs:?}");
+            for self_cursor in 0..self.size {
+                while rhs.data_index[rhs_cursor] < self.data_index[self_cursor] {
+                    if ret_cursor == CAPACITY {
+                        return Err(());
+                    }
+                    ret.data_index[ret_cursor] = rhs.data_index[rhs_cursor];
+                    ret.data[ret_cursor] = rhs.data[rhs_cursor];
+                    ret_cursor += 1;
 
-        let mut ret: SparseSimd<CAPACITY, S> = SparseSimd {
-            data_index: [S; CAPACITY],
-            data: [0.; CAPACITY],
-            size: 0,
-        };
+                    rhs_cursor += 1;
+                }
+                if rhs.data_index[rhs_cursor] == self.data_index[self_cursor] {
+                    if ret_cursor == CAPACITY {
+                        return Err(());
+                    }
+                    ret.data_index[ret_cursor] = rhs.data_index[rhs_cursor];
+                    ret.data[ret_cursor] = self.data[self_cursor] + rhs.data[rhs_cursor];
+                    ret_cursor += 1;
 
-        let mut rhs_cursor = 0;
-        let mut ret_cursor = 0;
+                    rhs_cursor += 1;
+                } else {
+                    if ret_cursor == CAPACITY {
+                        return Err(());
+                    }
+                    ret.data_index[ret_cursor] = self.data_index[self_cursor];
+                    ret.data[ret_cursor] = self.data[self_cursor];
+                    ret_cursor += 1;
+                }
+            }
+            while rhs_cursor < rhs.size {
+                if ret_cursor == CAPACITY {
+                    return Err(());
+                }
 
-        for self_cursor in 0..self.size {
-            while rhs.data_index[rhs_cursor] < self.data_index[self_cursor] {
                 ret.data_index[ret_cursor] = rhs.data_index[rhs_cursor];
                 ret.data[ret_cursor] = rhs.data[rhs_cursor];
                 ret_cursor += 1;
 
                 rhs_cursor += 1;
             }
-            if rhs.data_index[rhs_cursor] == self.data_index[self_cursor] {
-                ret.data_index[ret_cursor] = rhs.data_index[rhs_cursor];
-                ret.data[ret_cursor] = self.data[self_cursor] + rhs.data[rhs_cursor];
-                ret_cursor += 1;
 
-                rhs_cursor += 1;
-            } else {
-                ret.data_index[ret_cursor] = self.data_index[self_cursor];
-                ret.data[ret_cursor] = self.data[self_cursor];
-                ret_cursor += 1;
-            }
+            ret.size = ret_cursor;
+
+            self.data = ret.data;
+            self.data_index = ret.data_index;
+            self.size = ret.size;
+
+            Ok(())
         }
-        while rhs_cursor < rhs.size {
-            ret.data_index[ret_cursor] = rhs.data_index[rhs_cursor];
-            ret.data[ret_cursor] = rhs.data[rhs_cursor];
-            ret_cursor += 1;
-
-            rhs_cursor += 1;
-        }
-
-        ret.size = ret_cursor;
-
-        println!("end acumulation with {ret:?}");
-
-        println!("self before result {self:?}");
-
-        self.data = ret.data;
-        self.data_index = ret.data_index;
-        self.size = ret.size;
-
-        println!("self is now {self:?}");
     }
 
     pub fn multiply(&mut self, rhs: f32) {

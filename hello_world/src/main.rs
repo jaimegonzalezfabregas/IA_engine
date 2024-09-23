@@ -1,6 +1,7 @@
 #![feature(generic_arg_infer)]
 
 use ia_engine::{
+    dual::Dual,
     simd_arr::dense_simd::DenseSimd,
     trainer::{default_param_translator, DataPoint, Trainer},
 };
@@ -15,8 +16,12 @@ fn main() {
         output: [-200.],
     }];
 
-    let mut trainer: Trainer<_, _, _, _, DenseSimd<_>, _, _, _> =
-        Trainer::new(direct, direct, default_param_translator, ());
+    let mut trainer: Trainer<_, _, _, _, DenseSimd<_>, _, _, _> = Trainer::new(
+        direct,
+        direct,
+        default_param_translator,
+        (),
+    );
 
     while trainer.train_step(&dataset) {
         println!("{:?}", trainer.get_model_params());

@@ -1,16 +1,17 @@
 use std::{array, sync::mpsc::Sender};
 
 use ia_engine::{
+    dual::Dual,
     simd_arr::{hybrid_simd::HybridSimd, SimdArr},
     trainer::{DataPoint, Trainer},
 };
 use image::{DynamicImage, GenericImageView, ImageReader};
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 use crate::{tiler, TrainerComunicationCodes, TILE_COUNT};
 
-/* 
+/*
 fn enforce_separation(
     p1: (f32, f32),
     p1_old: (f32, f32),
@@ -109,10 +110,9 @@ fn colision_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P
 }
 */
 
-
 fn max_speed_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P]) -> [f32; P] {
     let ret = array::from_fn(|i| match i % 5 {
-        0 | 1 => ((params[i] + vector[i].max(-0.003).min(0.003)) + 1.) % 1.,
+        0 | 1 => (params[i] + vector[i]).max(0.).min(1.),
         _ => params[i] + vector[i],
     });
 
@@ -123,22 +123,17 @@ pub fn train_thread(
     tx: Sender<TrainerComunicationCodes<([f32; TILE_COUNT * 5], (Option<f32>, usize))>>,
     max_iterations: Option<usize>,
 ) {
-    train_work::<HybridSimd<_, {TILE_COUNT * 2}>>(Some(tx), max_iterations);
+    train_work::<HybridSimd<_, { TILE_COUNT * 2 }>>(Some(tx), max_iterations);
     // train_work::<DenseSimd<_>>(Some(tx), max_iterations);
 }
 
 fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
     tx: Option<Sender<TrainerComunicationCodes<([f32; TILE_COUNT * 5], (Option<f32>, usize))>>>,
     max_iterations: Option<usize>,
-) 
-{
+) {
     let mut rng = ChaCha8Rng::seed_from_u64(2);
-    let mut trainer: Trainer<_, _, _, _, S, _, _, _> = Trainer::new(
-        tiler,
-        tiler,
-        max_speed_param_translator,
-        (),
-    );
+    let mut trainer: Trainer<_, _, _, _, S, _, _, _> =
+        Trainer::new(tiler, tiler, max_speed_param_translator, ());
     if let Some(ref tx) = tx {
         tx.send(TrainerComunicationCodes::Msg((
             trainer.get_model_params(),
@@ -162,7 +157,7 @@ fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
     while local_minimum_count < 100 {
         pixels.shuffle(&mut rng);
 
-        for semi_pixels in pixels.array_chunks::<30>() {
+        for semi_pixels in pixels.array_chunks::<100>() {
             iterations += 1;
 
             if max_iterations
@@ -225,15 +220,11 @@ mod tests {
 
     use super::test::Bencher;
 
-    use ia_engine::simd_arr::{
-        dense_simd::DenseSimd, hybrid_simd::HybridSimd,
-        SimdArr,
-    };
+    use ia_engine::simd_arr::{dense_simd::DenseSimd, hybrid_simd::HybridSimd, SimdArr};
 
     use super::train_work;
 
-    fn bench<S: SimdArr<{ TILE_COUNT * 5 }>>()
-    {
+    fn bench<S: SimdArr<{ TILE_COUNT * 5 }>>() {
         let train_builder = thread::Builder::new()
             .name("train_thread".into())
             .stack_size(2 * 1024 * 1024 * 1024);
@@ -249,12 +240,20 @@ mod tests {
         b.iter(|| bench::<DenseSimd<_>>());
     }
     #[bench]
-    fn bench_hybrid_0(b: &mut Bencher) {
-        b.iter(|| bench::<HybridSimd<_, 0>>());
-    }
-    #[bench]
     fn bench_hybrid_1(b: &mut Bencher) {
         b.iter(|| bench::<HybridSimd<_, 1>>());
+    }
+    #[bench]
+    fn bench_hybrid_2(b: &mut Bencher) {
+        b.iter(|| bench::<HybridSimd<_, 2>>());
+    }
+    #[bench]
+    fn bench_hybrid_3(b: &mut Bencher) {
+        b.iter(|| bench::<HybridSimd<_, 3>>());
+    }
+    #[bench]
+    fn bench_hybrid_4(b: &mut Bencher) {
+        b.iter(|| bench::<HybridSimd<_, 4>>());
     }
     #[bench]
     fn bench_hybrid_10(b: &mut Bencher) {

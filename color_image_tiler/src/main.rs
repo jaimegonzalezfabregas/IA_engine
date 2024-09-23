@@ -15,6 +15,7 @@ extern crate piston_window;
 extern crate gfx;
 extern crate shader_version;
 
+use number_traits::Sqrt;
 use stats_visualizer_thread::stats_thread;
 use training_thread::train_thread;
 
@@ -35,8 +36,10 @@ impl Vertex {
     }
 }
 
-const TILE_COUNT: usize = 3;
-const TILE_BIAS: f32 = 0.95;
+const TILE_COUNT_SQRT: usize = 20;
+const TILE_COUNT: usize = TILE_COUNT_SQRT * TILE_COUNT_SQRT;
+const TILE_BIAS: f32 = 0.8;
+const PARTICLE_FREEDOM: isize = 1;
 
 gfx_defines! {
 
@@ -95,6 +98,14 @@ fn main() {
     let (vbuf, slice) = factory.create_vertex_buffer_with_slice(&vertex_data, index_data);
 
     let glsl = opengl.to_glsl();
+    let fragment = include_str!("../assets/cube_150_soft.glsl")
+        .replace("PARTICLE_FREEDOM", &format!("{}", PARTICLE_FREEDOM))
+        .replace("TILE_COUNT_SQRT", &format!("{}", TILE_COUNT_SQRT))
+        .replace("TILE_COUNT", &format!("{TILE_COUNT}"))
+        .replace("TILE_BIAS", &format!("{TILE_BIAS}"));
+
+    println!("{fragment}");
+
     let pso = factory
         .create_pipeline_simple(
             Shaders::new()
@@ -103,12 +114,7 @@ fn main() {
                 .unwrap()
                 .as_bytes(),
             Shaders::new()
-                .set(
-                    GLSL::V1_50,
-                    &include_str!("../assets/cube_150_soft.glsl")
-                        .replace("TILE_COUNT", &format!("{TILE_COUNT}"))
-                        .replace("TILE_BIAS", &format!("{TILE_BIAS}")),
-                )
+                .set(GLSL::V1_50, &fragment)
                 .get(glsl)
                 .unwrap()
                 .as_bytes(),
@@ -149,6 +155,7 @@ fn main() {
 
         let points: [[u8; 4]; TILE_COUNT] =
             array::from_fn(|i| [as_u8(params[i * 5]), as_u8(params[i * 5 + 1]), 0, 0]);
+        // array::from_fn(|_| [0,0, 0, 0]);
         let colors: [[u8; 4]; TILE_COUNT] = array::from_fn(|i| {
             [
                 as_u8(params[i * 5 + 2]),
@@ -200,4 +207,3 @@ fn main() {
         });
     }
 }
-

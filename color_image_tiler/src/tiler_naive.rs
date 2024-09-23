@@ -28,7 +28,7 @@ pub fn tiler<
     input: &[f32; 2],
     _: &(),
 ) -> [N; 3] {
-    let grid_size = PARTICLE_FREEDOM as f32 / TILE_COUNT_SQRT as f32;
+    let grid_size = PARTICLE_FREEDOM / TILE_COUNT_SQRT as f32;
 
     let cells: Vec<_> = params.array_chunks::<5>().collect();
 
@@ -37,25 +37,8 @@ pub fn tiler<
     let mut second_closest_d = N::from(1.);
     let mut second_closest_i = 0;
 
-    let sample_grid_x = (input[0] * TILE_COUNT_SQRT as f32).floor();
-    let sample_grid_y = (input[1] * TILE_COUNT_SQRT as f32).floor();
 
-    let surrounding_cells_offsets = (-PARTICLE_FREEDOM..PARTICLE_FREEDOM)
-        .flat_map(|dx| (-PARTICLE_FREEDOM..PARTICLE_FREEDOM).map(move |dy| (dx, dy)))
-        .collect::<Vec<_>>();
-
-    for (cell_dx, cell_dy) in surrounding_cells_offsets {
-        let cell_x = sample_grid_x as isize + cell_dx;
-        let cell_y = sample_grid_y as isize + cell_dy;
-
-        let i = cell_x * TILE_COUNT_SQRT as isize + cell_y;
-
-        if i < 0 || i >= TILE_COUNT as isize {
-            continue;
-        }
-
-        let i = i as usize;
-
+    for i in 0..TILE_COUNT {
         let base_x = (i / TILE_COUNT_SQRT) as f32;
         let base_y = (i % TILE_COUNT_SQRT) as f32;
 

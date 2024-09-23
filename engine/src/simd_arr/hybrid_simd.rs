@@ -39,21 +39,26 @@ impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
     }
 
     fn acumulate(&mut self, rhs: &Self) {
-        
         match (self, rhs) {
             (HybridSimd::Dense(a), HybridSimd::Dense(b)) => a.acumulate(b),
             (HybridSimd::Dense(a), HybridSimd::Sparse(b)) => {
                 let transformation = DenseSimd::new_from_array(b.to_array());
                 a.acumulate(&transformation);
             }
-            (res @ HybridSimd::Sparse(a), HybridSimd::Dense(b)) => {
-                let mut transformation = DenseSimd::new_from_array(a.to_array());
+            (res @ HybridSimd::Sparse(_), HybridSimd::Dense(b)) => {
+                let mut transformation = DenseSimd::new_from_array(res.to_array());
                 transformation.acumulate(b);
 
                 *res = HybridSimd::Dense(transformation);
             }
-            (HybridSimd::Sparse(a), HybridSimd::Sparse(b)) => {
-                a.acumulate(b);
+            (res @ HybridSimd::Sparse(_), HybridSimd::Sparse(b)) => {
+                let success = res.unwrap_sparse().acumulate(b);
+                if success.is_err() {
+                    let mut transformation_self = DenseSimd::new_from_array(res.to_array());
+                    let transformation_rhs = DenseSimd::new_from_array(b.to_array());
+                    transformation_self.acumulate(&transformation_rhs);
+                    *res = HybridSimd::Dense(transformation_self)
+                }
             }
         }
     }
@@ -62,6 +67,16 @@ impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
         match self {
             HybridSimd::Dense(d) => d.multiply(rhs),
             HybridSimd::Sparse(s) => s.multiply(rhs),
+        }
+    }
+}
+
+impl<const S: usize, const C: usize> HybridSimd<S, C> {
+    fn unwrap_sparse<'a>(&'a mut self) -> &'a mut SparseSimd<C, S> {
+        if let Self::Sparse(x) = self {
+            x
+        } else {
+            panic!();
         }
     }
 }
