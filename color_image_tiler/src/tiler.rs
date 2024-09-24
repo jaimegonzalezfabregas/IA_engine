@@ -3,7 +3,6 @@ use std::ops::{Add, Div, Mul, Sub};
 use std::fmt::Debug;
 
 use ia_engine::dual::extended_arithmetic::ExtendedArithmetic;
-use number_traits::Sqrt;
 
 use crate::{PARTICLE_FREEDOM, TILE_BIAS, TILE_COUNT, TILE_COUNT_SQRT};
 
@@ -40,44 +39,36 @@ pub fn tiler<
     let sample_grid_x = (input[0] * TILE_COUNT_SQRT as f32).floor();
     let sample_grid_y = (input[1] * TILE_COUNT_SQRT as f32).floor();
 
-    let surrounding_cells_offsets = (-PARTICLE_FREEDOM..PARTICLE_FREEDOM)
-        .flat_map(|dx| (-PARTICLE_FREEDOM..PARTICLE_FREEDOM).map(move |dy| (dx, dy)))
-        .collect::<Vec<_>>();
+    for cell_dx in -PARTICLE_FREEDOM..PARTICLE_FREEDOM {
+        for cell_dy in -PARTICLE_FREEDOM..PARTICLE_FREEDOM {
+            let cell_x = sample_grid_x as isize + cell_dx;
+            let cell_y = sample_grid_y as isize + cell_dy;
 
-    for (cell_dx, cell_dy) in surrounding_cells_offsets {
-        let cell_x = sample_grid_x as isize + cell_dx;
-        let cell_y = sample_grid_y as isize + cell_dy;
+            if cell_x < 0 || cell_x >= TILE_COUNT_SQRT as isize || cell_y < 0 || cell_y >= TILE_COUNT_SQRT as isize {
+                continue;
+            }
+            let i = (cell_x * TILE_COUNT_SQRT as isize + cell_y) as usize;
 
-        let i = cell_x * TILE_COUNT_SQRT as isize + cell_y;
+            let [relative_x, relative_y, _, _, _] = cells[i];
 
-        if i < 0 || i >= TILE_COUNT as isize {
-            continue;
-        }
+            let seed_x = relative_x.clone() * grid_size + cell_x as f32 / TILE_COUNT_SQRT as f32;
+            let seed_y = relative_y.clone() * grid_size + cell_y as f32 / TILE_COUNT_SQRT as f32;
 
-        let i = i as usize;
+            let x_d = seed_x - input[0];
+            let y_d = seed_y - input[1];
 
-        let base_x = (i / TILE_COUNT_SQRT) as f32;
-        let base_y = (i % TILE_COUNT_SQRT) as f32;
+            let d_2 = x_d.pow2() + y_d.pow2();
 
-        let [relative_x, relative_y, _, _, _] = cells[i];
+            if closest_d > d_2 {
+                second_closest_d = closest_d;
+                second_closest_i = closest_i;
 
-        let x = relative_x.clone() * grid_size + base_x / TILE_COUNT_SQRT as f32;
-        let y = relative_y.clone() * grid_size + base_y / TILE_COUNT_SQRT as f32;
-
-        let x_d = x.clone() - input[0];
-        let y_d = y.clone() - input[1];
-
-        let d_2 = x_d.pow2() + y_d.pow2();
-
-        if closest_d > d_2 {
-            second_closest_d = closest_d;
-            second_closest_i = closest_i;
-
-            closest_d = d_2;
-            closest_i = i;
-        } else if second_closest_d > d_2 {
-            second_closest_d = d_2;
-            second_closest_i = i;
+                closest_d = d_2;
+                closest_i = i;
+            } else if second_closest_d > d_2 {
+                second_closest_d = d_2;
+                second_closest_i = i;
+            }
         }
     }
 

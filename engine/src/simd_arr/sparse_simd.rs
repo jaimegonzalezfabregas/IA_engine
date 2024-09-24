@@ -233,7 +233,7 @@ mod sparse_simd_tests {
         let mut x = SparseSimd::<N, N>::new_from_array(&a).unwrap();
         let y = SparseSimd::<N, N>::new_from_array(&b).unwrap();
 
-        x.acumulate(&y);
+        x.acumulate(&y).unwrap();
 
         assert_eq!(x.to_array(), res)
     }
@@ -249,7 +249,7 @@ mod sparse_simd_tests {
         let mut x = SparseSimd::<N, N>::new_from_array(&a).unwrap();
         let y = SparseSimd::<N, N>::new_from_array(&b).unwrap().neg();
 
-        x.acumulate(&y);
+        x.acumulate(&y).unwrap();
 
         assert_eq!(x.to_array(), res)
     }

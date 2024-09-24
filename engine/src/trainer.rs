@@ -150,7 +150,7 @@ impl<
         let unit_gradient = cost.get_gradient();
         let og_parameters = array::from_fn(|i| self.params[i].get_real());
 
-        let mut factor = 2.;
+        let mut factor = 16.;
 
         while {
             let gradient = unit_gradient.map(|e| -e * factor);

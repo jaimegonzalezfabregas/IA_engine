@@ -702,7 +702,6 @@ dependencies = [
  "gfx",
  "ia_engine",
  "image",
- "number_traits",
  "piston",
  "piston2d-graphics",
  "piston_window",

@@ -10,11 +10,10 @@ debug = true
 
 ia_engine = { path = "../engine" } 
 
-number_traits = "0.2.4"
 piston = "1.0.0"
 piston2d-graphics = "0.44.0"
 piston_window = "0.132.0"
-image = "0.25.1"
+image = "0.25.2"
 gfx = "0.18.1"
 rand = "0.8.5"
 shader_version = "0.7.0"

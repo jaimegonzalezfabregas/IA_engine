@@ -5,6 +5,7 @@
 mod stats_visualizer_thread;
 mod tiler;
 mod training_thread;
+mod bench;
 
 use std::{array, sync::mpsc::channel, thread, time::SystemTime};
 
@@ -15,7 +16,6 @@ extern crate piston_window;
 extern crate gfx;
 extern crate shader_version;
 
-use number_traits::Sqrt;
 use stats_visualizer_thread::stats_thread;
 use training_thread::train_thread;
 
@@ -36,10 +36,10 @@ impl Vertex {
     }
 }
 
-const TILE_COUNT_SQRT: usize = 20;
+const TILE_COUNT_SQRT: usize = 30;
 const TILE_COUNT: usize = TILE_COUNT_SQRT * TILE_COUNT_SQRT;
-const TILE_BIAS: f32 = 0.8;
-const PARTICLE_FREEDOM: isize = 1;
+const TILE_BIAS: f32 = 0.9;
+const PARTICLE_FREEDOM: isize = 2;
 
 gfx_defines! {
 
@@ -103,8 +103,6 @@ fn main() {
         .replace("TILE_COUNT_SQRT", &format!("{}", TILE_COUNT_SQRT))
         .replace("TILE_COUNT", &format!("{TILE_COUNT}"))
         .replace("TILE_BIAS", &format!("{TILE_BIAS}"));
-
-    println!("{fragment}");
 
     let pso = factory
         .create_pipeline_simple(

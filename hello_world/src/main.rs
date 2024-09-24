@@ -1,7 +1,6 @@
 #![feature(generic_arg_infer)]
 
 use ia_engine::{
-    dual::Dual,
     simd_arr::dense_simd::DenseSimd,
     trainer::{default_param_translator, DataPoint, Trainer},
 };
