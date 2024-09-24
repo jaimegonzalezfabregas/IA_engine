@@ -27,9 +27,9 @@ pub fn tiler<
     input: &[f32; 2],
     _: &(),
 ) -> [N; 3] {
-    let grid_size = PARTICLE_FREEDOM as f32 / TILE_COUNT_SQRT as f32;
-
     let cells: Vec<_> = params.array_chunks::<5>().collect();
+
+    let grid_size = PARTICLE_FREEDOM as f32 / TILE_COUNT_SQRT as f32;
 
     let mut closest_d = N::from(1.);
     let mut closest_i = 0;
@@ -39,12 +39,16 @@ pub fn tiler<
     let sample_grid_x = (input[0] * TILE_COUNT_SQRT as f32).floor();
     let sample_grid_y = (input[1] * TILE_COUNT_SQRT as f32).floor();
 
-    for cell_dx in -PARTICLE_FREEDOM..PARTICLE_FREEDOM {
-        for cell_dy in -PARTICLE_FREEDOM..PARTICLE_FREEDOM {
+    for cell_dx in -PARTICLE_FREEDOM..=PARTICLE_FREEDOM {
+        for cell_dy in -PARTICLE_FREEDOM..=PARTICLE_FREEDOM {
             let cell_x = sample_grid_x as isize + cell_dx;
             let cell_y = sample_grid_y as isize + cell_dy;
 
-            if cell_x < 0 || cell_x >= TILE_COUNT_SQRT as isize || cell_y < 0 || cell_y >= TILE_COUNT_SQRT as isize {
+            if cell_x < 0
+                || cell_y < 0
+                || cell_x >= TILE_COUNT_SQRT as isize
+                || cell_y >= TILE_COUNT_SQRT as isize
+            {
                 continue;
             }
             let i = (cell_x * TILE_COUNT_SQRT as isize + cell_y) as usize;
@@ -77,7 +81,7 @@ pub fn tiler<
     let mix_factor = closest_d / second_closest_d;
 
     if mix_factor < TILE_BIAS {
-        [closest_r.clone(), closest_b.clone(), closest_g.clone()]
+        [closest_r.clone(), closest_g.clone(), closest_b.clone()]
     } else {
         let [_, _, second_closest_r, second_closest_g, second_closest_b] =
             cells[second_closest_i].clone();

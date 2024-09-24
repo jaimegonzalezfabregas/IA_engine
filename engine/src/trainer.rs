@@ -147,7 +147,9 @@ impl<
             &self.extra_data,
         );
 
-        let unit_gradient = cost.get_gradient();
+        let raw_gradient = cost.get_gradient();
+        let gradient_size = raw_gradient.iter().fold(0., |acc, elm| acc + (elm * elm));
+        let unit_gradient = array::from_fn(|i| raw_gradient[i] / gradient_size.sqrt());
         let og_parameters = array::from_fn(|i| self.params[i].get_real());
 
         let mut factor = 1.;
@@ -190,6 +192,10 @@ impl<
     }
 
     pub fn eval(&self, input: &[f32; I]) -> [f32; O] {
-        (self.model)(&self.params.clone().map(|e| e.get_real()), input, &self.extra_data)
+        (self.model)(
+            &self.params.clone().map(|e| e.get_real()),
+            input,
+            &self.extra_data,
+        )
     }
 }

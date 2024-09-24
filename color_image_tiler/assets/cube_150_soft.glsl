@@ -9,12 +9,12 @@ uniform sampler2D t_point;
 uniform sampler2D t_color;
 
 void main() {
+    float grid_size = PARTICLE_FREEDOM / float(TILE_COUNT_SQRT);
+
     float closest_d = 1;
     int closest_i = 0;
     float second_closest_d = 1;
     int second_closest_i = 0;
-
-    float grid_size = PARTICLE_FREEDOM / float(TILE_COUNT_SQRT);
 
     int sample_grid_x = int(floor(gl_FragCoord.x / 640 * TILE_COUNT_SQRT));
     int sample_grid_y = int(floor(gl_FragCoord.y / 640 * TILE_COUNT_SQRT));
@@ -39,10 +39,10 @@ void main() {
 
             int i = (cell_x * TILE_COUNT_SQRT) + cell_y;
 
-            vec4 point = texture(t_point, vec2((i + .5) / TILE_COUNT, 0));
+            vec4 relative = texture(t_point, vec2((i + .5) / TILE_COUNT, 0));
 
-            float seed_x = point.x * grid_size + float(cell_x) / TILE_COUNT_SQRT;
-            float seed_y = point.y * grid_size + float(cell_y) / TILE_COUNT_SQRT;
+            float seed_x = relative.x * grid_size + float(cell_x) / TILE_COUNT_SQRT;
+            float seed_y = relative.y * grid_size + float(cell_y) / TILE_COUNT_SQRT;
 
             float x_d = seed_x - gl_FragCoord.x / 640;
             float y_d = seed_y - gl_FragCoord.y / 640;

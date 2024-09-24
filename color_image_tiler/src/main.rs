@@ -3,11 +3,17 @@
 #![feature(test)]
 
 mod bench;
+mod seed;
 mod stats_visualizer_thread;
 mod tiler;
 mod training_thread;
 
-use std::{array, sync::mpsc::channel, thread, time::SystemTime};
+use std::{
+    array,
+    sync::mpsc::channel,
+    thread,
+    time::{Duration, SystemTime},
+};
 
 use crate::tiler::tiler;
 
@@ -16,11 +22,17 @@ extern crate piston_window;
 extern crate gfx;
 extern crate shader_version;
 
+use seed::Seed;
 use stats_visualizer_thread::stats_thread;
 use training_thread::train_thread;
 
-//----------------------------------------
-// Cube associated data
+const TILE_COUNT_SQRT: usize = 20;
+const TILE_COUNT: usize = TILE_COUNT_SQRT * TILE_COUNT_SQRT;
+const TILE_BIAS: f32 = 0.7;
+const PARTICLE_FREEDOM: isize = 1;
+
+const ACCELERATED: bool = true;
+const RES_2D: usize = 100;
 
 gfx_vertex_struct!(Vertex {
     a_pos: [i8; 4] = "a_pos",
@@ -35,11 +47,6 @@ impl Vertex {
         }
     }
 }
-
-const TILE_COUNT_SQRT: usize = 8;
-const TILE_COUNT: usize = TILE_COUNT_SQRT * TILE_COUNT_SQRT;
-const TILE_BIAS: f32 = 0.5;
-const PARTICLE_FREEDOM: isize = 1;
 
 gfx_defines! {
 
@@ -65,9 +72,6 @@ pub enum TrainerComunicationCodes<T> {
     Die,
     Msg(T),
 }
-
-const ACCELERATED: bool = false;
-const RES_2D: usize = 10;
 
 fn main() {
     use gfx::traits::*;
@@ -154,48 +158,48 @@ fn main() {
 
         let t = now.elapsed().unwrap().as_millis() as f32 / 1000.;
 
-        let points: [[u8; 4]; TILE_COUNT] =
-            array::from_fn(|i| [as_u8(params[i * 5]), as_u8(params[i * 5 + 1]), 0, 0]);
-        // array::from_fn(|_| [0,0, 0, 0]);
-        let colors: [[u8; 4]; TILE_COUNT] = array::from_fn(|i| {
-            [
-                as_u8(params[i * 5 + 2]),
-                as_u8(params[i * 5 + 3]),
-                as_u8(params[i * 5 + 4]),
-                u8::MAX,
-            ]
-        });
-
-        let (_, texture_view_points) = factory
-            .create_texture_immutable::<gfx::format::Rgba8>(
-                gfx::texture::Kind::D2(TILE_COUNT as u16, 1, gfx::texture::AaMode::Single),
-                gfx::texture::Mipmap::Provided,
-                &[&points],
-            )
-            .unwrap();
-
-        let (_, texture_view_colors) = factory
-            .create_texture_immutable::<gfx::format::Rgba8>(
-                gfx::texture::Kind::D2(TILE_COUNT as u16, 1, gfx::texture::AaMode::Single),
-                gfx::texture::Mipmap::Provided,
-                &[&colors],
-            )
-            .unwrap();
-
-        let sinfo = gfx::texture::SamplerInfo::new(
-            gfx::texture::FilterMethod::Scale,
-            gfx::texture::WrapMode::Clamp,
-        );
-
-        let data = pipe::Data {
-            vbuf: vbuf.clone(),
-            out_color: window.output_color.clone(),
-            u_time: factory.create_constant_buffer(1),
-            t_color: (texture_view_colors, factory.create_sampler(sinfo)),
-            t_point: (texture_view_points, factory.create_sampler(sinfo)),
-        };
-
         if ACCELERATED {
+            let points: [[u8; 4]; TILE_COUNT] =
+                array::from_fn(|i| [as_u8(params[i * 5]), as_u8(params[i * 5 + 1]), 0, 0]);
+            // array::from_fn(|_| [0,0, 0, 0]);
+            let colors: [[u8; 4]; TILE_COUNT] = array::from_fn(|i| {
+                [
+                    as_u8(params[i * 5 + 2]),
+                    as_u8(params[i * 5 + 3]),
+                    as_u8(params[i * 5 + 4]),
+                    u8::MAX,
+                ]
+            });
+
+            let (_, texture_view_points) = factory
+                .create_texture_immutable::<gfx::format::Rgba8>(
+                    gfx::texture::Kind::D2(TILE_COUNT as u16, 1, gfx::texture::AaMode::Single),
+                    gfx::texture::Mipmap::Provided,
+                    &[&points],
+                )
+                .unwrap();
+
+            let (_, texture_view_colors) = factory
+                .create_texture_immutable::<gfx::format::Rgba8>(
+                    gfx::texture::Kind::D2(TILE_COUNT as u16, 1, gfx::texture::AaMode::Single),
+                    gfx::texture::Mipmap::Provided,
+                    &[&colors],
+                )
+                .unwrap();
+
+            let sinfo = gfx::texture::SamplerInfo::new(
+                gfx::texture::FilterMethod::Scale,
+                gfx::texture::WrapMode::Clamp,
+            );
+
+            let data = pipe::Data {
+                vbuf: vbuf.clone(),
+                out_color: window.output_color.clone(),
+                u_time: factory.create_constant_buffer(1),
+                t_color: (texture_view_colors, factory.create_sampler(sinfo)),
+                t_point: (texture_view_points, factory.create_sampler(sinfo)),
+            };
+
             window.draw_3d(&e, |window| {
                 window
                     .encoder
@@ -220,10 +224,10 @@ fn main() {
                         );
 
                         rectangle(
-                            [col[0], col[1], col[2], 1.], // red
+                            [col[0], col[1], col[2], 1.],
                             [
                                 x as f64 * 640. / RES_2D as f64,
-                                y as f64 * 640. / RES_2D as f64,
+                                640. - (y + 1) as f64 * 640. / RES_2D as f64,
                                 640. / RES_2D as f64,
                                 640. / RES_2D as f64,
                             ], // rectangle
@@ -231,6 +235,17 @@ fn main() {
                             g,
                         );
                     }
+                }
+
+                for (i, arr) in params.array_chunks::<5>().enumerate() {
+                    let seed = Seed::new(arr[0], arr[1], i);
+
+                    rectangle(
+                        [1., 0., 1., 1.],                                              // red
+                        [seed.x as f64 * 640., 640. - seed.y as f64 * 640., 2., 2.], // rectangle
+                        c.transform,
+                        g,
+                    );
                 }
             });
         }

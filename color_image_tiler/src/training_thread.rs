@@ -7,7 +7,9 @@ use ia_engine::{
 use image::{imageops::sample_bilinear, DynamicImage, ImageReader};
 use rand::Rng;
 
-use crate::{tiler, TrainerComunicationCodes, PARTICLE_FREEDOM, TILE_COUNT, TILE_COUNT_SQRT};
+use crate::{
+    seed::Seed, tiler, TrainerComunicationCodes, PARTICLE_FREEDOM, TILE_COUNT, TILE_COUNT_SQRT,
+};
 
 fn max_speed_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P]) -> [f32; P] {
     let ret = array::from_fn(|i| match i % 5 {
@@ -40,7 +42,7 @@ pub(crate) fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
         .unwrap();
     }
 
-    let img = ImageReader::open("assets/circle.png")
+    let img = ImageReader::open("assets/rust.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -107,11 +109,8 @@ fn dataset_provider(
     let seeds = params.array_chunks::<5>().collect::<Vec<_>>();
 
     for (i, seed) in seeds.iter().enumerate() {
-        let cell_x = i / TILE_COUNT_SQRT;
-        let cell_y = i % TILE_COUNT_SQRT;
         let [relative_x, relative_y, _, _, _] = seed;
-        let x = (cell_x as f32 + relative_x * PARTICLE_FREEDOM as f32) / TILE_COUNT_SQRT as f32;
-        let y = (cell_y as f32 + relative_y * PARTICLE_FREEDOM as f32) / TILE_COUNT_SQRT as f32;
+        let og = Seed::new(*relative_x, *relative_y, i);
 
         for (dx, dy) in [
             (1, 0),
@@ -123,8 +122,8 @@ fn dataset_provider(
             (-1, 1),
             (1, -1),
         ] {
-            let neigh_cell_x = cell_x as isize + dx;
-            let neigh_cell_y = cell_y as isize + dy;
+            let neigh_cell_x = og.cell_x as isize + dx;
+            let neigh_cell_y = og.cell_y as isize + dy;
 
             if neigh_cell_x < 0 || neigh_cell_x >= TILE_COUNT_SQRT as isize {
                 continue;
@@ -137,13 +136,10 @@ fn dataset_provider(
 
             let [other_relative_x, other_relative_y, _, _, _] = seeds[j];
 
-            let other_x = (neigh_cell_x as f32 + other_relative_x * PARTICLE_FREEDOM as f32)
-                / TILE_COUNT_SQRT as f32;
-            let other_y = (neigh_cell_y as f32 + other_relative_y * PARTICLE_FREEDOM as f32)
-                / TILE_COUNT_SQRT as f32;
+            let other = Seed::new(*other_relative_x, *other_relative_y, j);
 
-            let mid_x = (other_x + x) / 2.;
-            let mid_y = (other_y + y) / 2.;
+            let mid_x = (other.x + og.x) / 2.;
+            let mid_y = (other.y + og.y) / 2.;
 
             let c = sample_bilinear(img, mid_x, mid_y).unwrap();
 
