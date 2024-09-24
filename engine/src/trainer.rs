@@ -150,7 +150,7 @@ impl<
         let unit_gradient = cost.get_gradient();
         let og_parameters = array::from_fn(|i| self.params[i].get_real());
 
-        let mut factor = 16.;
+        let mut factor = 1.;
 
         while {
             let gradient = unit_gradient.map(|e| -e * factor);
@@ -162,12 +162,7 @@ impl<
                 self.params[i].set_real(*param);
             }
 
-            let new_cost: f32 = dataset_cost(
-                dataset,
-                &new_params,
-                &self.model,
-                &self.extra_data,
-            );
+            let new_cost: f32 = dataset_cost(dataset, &new_params, &self.model, &self.extra_data);
 
             // println!("  new cost: {}, old_cost: {}", new_cost, cost.get_real());
 
@@ -192,5 +187,9 @@ impl<
 
     pub fn get_last_cost(&self) -> Option<f32> {
         None
+    }
+
+    pub fn eval(&self, input: &[f32; I]) -> [f32; O] {
+        (self.model)(&self.params.clone().map(|e| e.get_real()), input, &self.extra_data)
     }
 }

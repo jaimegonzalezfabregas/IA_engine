@@ -19,6 +19,15 @@ void main() {
     int sample_grid_x = int(floor(gl_FragCoord.x / 640 * TILE_COUNT_SQRT));
     int sample_grid_y = int(floor(gl_FragCoord.y / 640 * TILE_COUNT_SQRT));
 
+    float inner_coord_x = gl_FragCoord.x / 640 * TILE_COUNT_SQRT - sample_grid_x;
+    float inner_coord_y = gl_FragCoord.y / 640 * TILE_COUNT_SQRT - sample_grid_y;
+
+    if (inner_coord_x < 0.03 ||
+            inner_coord_y < 0.03) {
+        o_Color = vec4(1, 0, 1, 0);
+        return;
+    }
+
     for (int cell_dx = -PARTICLE_FREEDOM; cell_dx <= PARTICLE_FREEDOM; cell_dx++) {
         for (int cell_dy = -PARTICLE_FREEDOM; cell_dy <= PARTICLE_FREEDOM; cell_dy++) {
             int cell_x = sample_grid_x + cell_dx;

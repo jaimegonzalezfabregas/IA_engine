@@ -2,10 +2,10 @@
 #![feature(generic_arg_infer)]
 #![feature(test)]
 
+mod bench;
 mod stats_visualizer_thread;
 mod tiler;
 mod training_thread;
-mod bench;
 
 use std::{array, sync::mpsc::channel, thread, time::SystemTime};
 
@@ -36,10 +36,10 @@ impl Vertex {
     }
 }
 
-const TILE_COUNT_SQRT: usize = 30;
+const TILE_COUNT_SQRT: usize = 8;
 const TILE_COUNT: usize = TILE_COUNT_SQRT * TILE_COUNT_SQRT;
-const TILE_BIAS: f32 = 0.9;
-const PARTICLE_FREEDOM: isize = 2;
+const TILE_BIAS: f32 = 0.5;
+const PARTICLE_FREEDOM: isize = 1;
 
 gfx_defines! {
 
@@ -65,6 +65,9 @@ pub enum TrainerComunicationCodes<T> {
     Die,
     Msg(T),
 }
+
+const ACCELERATED: bool = false;
+const RES_2D: usize = 10;
 
 fn main() {
     use gfx::traits::*;
@@ -192,16 +195,44 @@ fn main() {
             t_point: (texture_view_points, factory.create_sampler(sinfo)),
         };
 
-        window.draw_3d(&e, |window| {
-            window
-                .encoder
-                .update_constant_buffer(&data.u_time, &Globals { time: t % 1. });
+        if ACCELERATED {
+            window.draw_3d(&e, |window| {
+                window
+                    .encoder
+                    .update_constant_buffer(&data.u_time, &Globals { time: t % 1. });
 
-            window
-                .encoder
-                .clear(&window.output_color, [0., 0., t % 1., 1.0]);
+                window
+                    .encoder
+                    .clear(&window.output_color, [0., 0., t % 1., 1.0]);
 
-            window.encoder.draw(&slice, &pso, &data);
-        });
+                window.encoder.draw(&slice, &pso, &data);
+            });
+        } else {
+            window.draw_2d(&e, |c, g, _| {
+                clear([1., 0., 1., 1.0], g);
+
+                for x in 0..RES_2D {
+                    for y in 0..RES_2D {
+                        let col = tiler(
+                            &params,
+                            &[x as f32 / RES_2D as f32, y as f32 / RES_2D as f32],
+                            &(),
+                        );
+
+                        rectangle(
+                            [col[0], col[1], col[2], 1.], // red
+                            [
+                                x as f64 * 640. / RES_2D as f64,
+                                y as f64 * 640. / RES_2D as f64,
+                                640. / RES_2D as f64,
+                                640. / RES_2D as f64,
+                            ], // rectangle
+                            c.transform,
+                            g,
+                        );
+                    }
+                }
+            });
+        }
     }
 }
