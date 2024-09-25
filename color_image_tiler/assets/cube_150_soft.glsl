@@ -16,11 +16,14 @@ void main() {
     float second_closest_d = 1;
     int second_closest_i = 0;
 
-    int sample_grid_x = int(floor(gl_FragCoord.x / 640 * TILE_COUNT_SQRT));
-    int sample_grid_y = int(floor(gl_FragCoord.y / 640 * TILE_COUNT_SQRT));
+    float input_x = gl_FragCoord.x / 640;
+    float input_y = 1 - gl_FragCoord.y / 640;
 
-    float inner_coord_x = gl_FragCoord.x / 640 * TILE_COUNT_SQRT - sample_grid_x;
-    float inner_coord_y = gl_FragCoord.y / 640 * TILE_COUNT_SQRT - sample_grid_y;
+    int sample_grid_x = int(floor(input_x * TILE_COUNT_SQRT));
+    int sample_grid_y = int(floor(input_y * TILE_COUNT_SQRT));
+
+    float inner_coord_x = input_x * TILE_COUNT_SQRT - sample_grid_x;
+    float inner_coord_y = input_y * TILE_COUNT_SQRT - sample_grid_y;
 
     if (inner_coord_x < 0.03 ||
             inner_coord_y < 0.03) {
@@ -44,8 +47,8 @@ void main() {
             float seed_x = relative.x * grid_size + float(cell_x) / TILE_COUNT_SQRT;
             float seed_y = relative.y * grid_size + float(cell_y) / TILE_COUNT_SQRT;
 
-            float x_d = seed_x - gl_FragCoord.x / 640;
-            float y_d = seed_y - gl_FragCoord.y / 640;
+            float x_d = seed_x - input_x;
+            float y_d = seed_y - input_y;
 
             float d_2 = (x_d * x_d) + (y_d * y_d);
 

@@ -2,7 +2,7 @@ use std::ops::Div;
 
 use crate::simd_arr::SimdArr;
 
-use super::Dual;
+use super::{check_nan, Dual};
 
 impl<const P: usize, S: SimdArr<P>> Div<Dual<P, S>> for Dual<P, S> {
     type Output = Dual<P, S>;
@@ -17,7 +17,7 @@ impl<const P: usize, S: SimdArr<P>> Div<Dual<P, S>> for Dual<P, S> {
 
         self.real /= rhs.real;
 
-        self
+        check_nan(self)
     }
 }
 
@@ -29,6 +29,6 @@ impl<const P: usize, S: SimdArr<P>> Div<f32> for Dual<P, S> {
 
         self.sigma.multiply(1. / rhs);
 
-        self
+        check_nan(self)
     }
 }

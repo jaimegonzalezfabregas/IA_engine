@@ -149,17 +149,23 @@ impl<
 
         let raw_gradient = cost.get_gradient();
         let gradient_size = raw_gradient.iter().fold(0., |acc, elm| acc + (elm * elm));
+
+        if gradient_size < 0.000001 {
+            return false;
+        }
+
         let unit_gradient = array::from_fn(|i| raw_gradient[i] / gradient_size.sqrt());
         let og_parameters = array::from_fn(|i| self.params[i].get_real());
 
-        let mut factor = 1.;
+        // println!("  raw gradient is : {raw_gradient:?}");
+
+        let mut factor = 10.;
 
         while {
             let gradient = unit_gradient.map(|e| -e * factor);
 
             let new_params = (self.param_translator)(&og_parameters, &gradient);
 
-            // println!("  gradient is : {gradient:?}, took from {og_parameters:?} to {new_params:?}");
             for (i, param) in new_params.iter().enumerate() {
                 self.params[i].set_real(*param);
             }

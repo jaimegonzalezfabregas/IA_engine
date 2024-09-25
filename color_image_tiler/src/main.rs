@@ -8,12 +8,7 @@ mod stats_visualizer_thread;
 mod tiler;
 mod training_thread;
 
-use std::{
-    array,
-    sync::mpsc::channel,
-    thread,
-    time::{Duration, SystemTime},
-};
+use std::{array, sync::mpsc::channel, thread, time::SystemTime};
 
 use crate::tiler::tiler;
 
@@ -28,11 +23,11 @@ use training_thread::train_thread;
 
 const TILE_COUNT_SQRT: usize = 20;
 const TILE_COUNT: usize = TILE_COUNT_SQRT * TILE_COUNT_SQRT;
-const TILE_BIAS: f32 = 0.7;
-const PARTICLE_FREEDOM: isize = 1;
+const TILE_BIAS: f32 = 0.5;
+const PARTICLE_FREEDOM: isize = 2;
 
 const ACCELERATED: bool = true;
-const RES_2D: usize = 100;
+const RES_2D: usize = 150;
 
 gfx_vertex_struct!(Vertex {
     a_pos: [i8; 4] = "a_pos",
@@ -227,7 +222,7 @@ fn main() {
                             [col[0], col[1], col[2], 1.],
                             [
                                 x as f64 * 640. / RES_2D as f64,
-                                640. - (y + 1) as f64 * 640. / RES_2D as f64,
+                                y as f64 * 640. / RES_2D as f64,
                                 640. / RES_2D as f64,
                                 640. / RES_2D as f64,
                             ], // rectangle
@@ -241,8 +236,8 @@ fn main() {
                     let seed = Seed::new(arr[0], arr[1], i);
 
                     rectangle(
-                        [1., 0., 1., 1.],                                              // red
-                        [seed.x as f64 * 640., 640. - seed.y as f64 * 640., 2., 2.], // rectangle
+                        [1., 0., 1., 1.],                                     // red
+                        [seed.x as f64 * 640., seed.y as f64 * 640., 2., 2.], // rectangle
                         c.transform,
                         g,
                     );

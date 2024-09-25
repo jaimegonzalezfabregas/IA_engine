@@ -92,3 +92,12 @@ impl<const P: usize, S: SimdArr<P>> From<Dual<P, S>> for f32 {
         value.get_real()
     }
 }
+
+fn check_nan<const P: usize, S: SimdArr<P>>(d: Dual<P, S>) -> Dual<P, S> {
+    assert!(d.get_real().is_finite());
+    for x in d.get_gradient() {
+        assert!(x.is_finite());
+    }
+
+    d
+}

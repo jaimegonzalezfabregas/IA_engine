@@ -1,4 +1,4 @@
-use std::{array, cell, sync::mpsc::Sender};
+use std::{array, sync::mpsc::Sender};
 
 use ia_engine::{
     simd_arr::{hybrid_simd::HybridSimd, SimdArr},
@@ -7,17 +7,10 @@ use ia_engine::{
 use image::{imageops::sample_bilinear, DynamicImage, ImageReader};
 use rand::Rng;
 
-use crate::{
-    seed::Seed, tiler, TrainerComunicationCodes, PARTICLE_FREEDOM, TILE_COUNT, TILE_COUNT_SQRT,
-};
+use crate::{seed::Seed, tiler, TrainerComunicationCodes, TILE_COUNT, TILE_COUNT_SQRT};
 
 fn max_speed_param_translator<const P: usize>(params: &[f32; P], vector: &[f32; P]) -> [f32; P] {
-    let ret = array::from_fn(|i| match i % 5 {
-        0 | 1 => (params[i] + vector[i]).min(1.).max(0.),
-        _ => params[i] + vector[i],
-    });
-
-    ret
+    array::from_fn(|i| (params[i] + vector[i]).max(0.).min(1.))
 }
 
 pub fn train_thread(
@@ -42,7 +35,7 @@ pub(crate) fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
         .unwrap();
     }
 
-    let img = ImageReader::open("assets/rust.png")
+    let img = ImageReader::open("assets/circle.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -51,7 +44,7 @@ pub(crate) fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
     let mut local_minimum_count = 0;
     let mut iterations = 0;
     while local_minimum_count < 100 {
-        let pixels = dataset_provider(&img, 400, &trainer.get_model_params());
+        let pixels = dataset_provider(&img, 100, &trainer.get_model_params());
 
         iterations += 1;
 
@@ -67,6 +60,10 @@ pub(crate) fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
 
         if !trainer.train_step(&pixels) {
             local_minimum_count += 1;
+
+
+            trainer
+
         } else {
             local_minimum_count = 0;
         }
@@ -104,7 +101,7 @@ fn dataset_provider(
         })
         .collect();
 
-    let mut deliberate_samples = vec![];
+    let mut deliberate_samples: Vec<DataPoint<{ TILE_COUNT * 5 }, 2, 3>> = vec![];
 
     let seeds = params.array_chunks::<5>().collect::<Vec<_>>();
 
@@ -141,16 +138,18 @@ fn dataset_provider(
             let mid_x = (other.x + og.x) / 2.;
             let mid_y = (other.y + og.y) / 2.;
 
-            let c = sample_bilinear(img, mid_x, mid_y).unwrap();
+            let c = sample_bilinear(img, mid_x, mid_y);
 
-            deliberate_samples.push(DataPoint {
-                input: [mid_x, mid_y],
-                output: [
-                    c.0[0] as f32 / u8::MAX as f32,
-                    c.0[1] as f32 / u8::MAX as f32,
-                    c.0[2] as f32 / u8::MAX as f32,
-                ],
-            });
+            if let Some(c) = c {
+                deliberate_samples.push(DataPoint {
+                    input: [mid_x, mid_y],
+                    output: [
+                        c.0[0] as f32 / u8::MAX as f32,
+                        c.0[1] as f32 / u8::MAX as f32,
+                        c.0[2] as f32 / u8::MAX as f32,
+                    ],
+                });
+            }
         }
     }
 

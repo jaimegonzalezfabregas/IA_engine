@@ -78,28 +78,32 @@ pub fn tiler<
 
     let [_, _, closest_r, closest_g, closest_b] = cells[closest_i].clone();
 
-    let mix_factor = closest_d / second_closest_d;
-
-    if mix_factor < TILE_BIAS {
+    if second_closest_d == 0. {
         [closest_r.clone(), closest_g.clone(), closest_b.clone()]
     } else {
-        let [_, _, second_closest_r, second_closest_g, second_closest_b] =
-            cells[second_closest_i].clone();
+        let mix_factor = closest_d / second_closest_d;
 
-        let biased_mix_factor = if mix_factor < TILE_BIAS {
-            N::from(0.)
+        if mix_factor <= TILE_BIAS {
+            [closest_r.clone(), closest_g.clone(), closest_b.clone()]
         } else {
-            (mix_factor - TILE_BIAS) / (1. - TILE_BIAS) / 2.
-        };
+            let [_, _, second_closest_r, second_closest_g, second_closest_b] =
+                cells[second_closest_i].clone();
 
-        let anti_biased_mix_factor = N::from(1.) - biased_mix_factor.clone();
+            let biased_mix_factor = if mix_factor < TILE_BIAS {
+                N::from(0.)
+            } else {
+                (mix_factor - TILE_BIAS) / (1. - TILE_BIAS) / 2.
+            };
 
-        [
-            (closest_r * anti_biased_mix_factor.clone())
-                + (second_closest_r * biased_mix_factor.clone()),
-            (closest_g * anti_biased_mix_factor.clone())
-                + (second_closest_g * biased_mix_factor.clone()),
-            (closest_b * anti_biased_mix_factor) + (second_closest_b * biased_mix_factor),
-        ]
+            let anti_biased_mix_factor = N::from(1.) - biased_mix_factor.clone();
+
+            [
+                (closest_r * anti_biased_mix_factor.clone())
+                    + (second_closest_r * biased_mix_factor.clone()),
+                (closest_g * anti_biased_mix_factor.clone())
+                    + (second_closest_g * biased_mix_factor.clone()),
+                (closest_b * anti_biased_mix_factor) + (second_closest_b * biased_mix_factor),
+            ]
+        }
     }
 }

@@ -2,7 +2,7 @@ use std::ops::Mul;
 
 use crate::simd_arr::SimdArr;
 
-use super::Dual;
+use super::{check_nan, Dual};
 
 impl<const P: usize, S: SimdArr<P>> Mul<Dual<P, S>> for Dual<P, S> {
     type Output = Dual<P, S>;
@@ -15,7 +15,7 @@ impl<const P: usize, S: SimdArr<P>> Mul<Dual<P, S>> for Dual<P, S> {
 
         self.sigma.acumulate(&rhs.sigma);
 
-        self
+        check_nan(self)
     }
 }
 
@@ -27,6 +27,6 @@ impl<const P: usize, S: SimdArr<P>> Mul<f32> for Dual<P, S> {
 
         self.sigma.multiply(rhs);
 
-        self
+        check_nan(self)
     }
 }
