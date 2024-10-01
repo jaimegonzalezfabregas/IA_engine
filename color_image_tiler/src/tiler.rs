@@ -1,8 +1,13 @@
+mod color;
+mod vec2;
+
 use std::ops::{Add, Div, Mul, Sub};
 
 use std::fmt::Debug;
 
+use color::{get_color, mix};
 use ia_engine::dual::extended_arithmetic::ExtendedArithmetic;
+use vec2::{project_point_to_vector, Vec2};
 
 use crate::{PARTICLE_FREEDOM, TILE_BIAS, TILE_COUNT, TILE_COUNT_SQRT};
 
@@ -27,14 +32,18 @@ pub fn tiler<
     input: &[f32; 2],
     _: &(),
 ) -> [N; 3] {
-    let cells: Vec<_> = params.array_chunks::<5>().collect();
+    let cells: Vec<_> = params.array_chunks::<5>().cloned().collect();
+
+    let input_point = Vec2::new(N::from(input[0]), N::from(input[1]));
 
     let grid_size = PARTICLE_FREEDOM as f32 / TILE_COUNT_SQRT as f32;
 
     let mut closest_d = N::from(1.);
     let mut closest_i = 0;
+    let mut closest_point = Vec2::zero();
     let mut second_closest_d = N::from(1.);
     let mut second_closest_i = 0;
+    let mut second_closest_point = Vec2::zero();
 
     let sample_grid_x = (input[0] * TILE_COUNT_SQRT as f32).floor();
     let sample_grid_y = (input[1] * TILE_COUNT_SQRT as f32).floor();
@@ -53,57 +62,55 @@ pub fn tiler<
             }
             let i = (cell_x * TILE_COUNT_SQRT as isize + cell_y) as usize;
 
-            let [relative_x, relative_y, _, _, _] = cells[i];
+            let [relative_x, relative_y, _, _, _] = &cells[i];
 
-            let seed_x = relative_x.clone() * grid_size + cell_x as f32 / TILE_COUNT_SQRT as f32;
-            let seed_y = relative_y.clone() * grid_size + cell_y as f32 / TILE_COUNT_SQRT as f32;
+            let seed_point = Vec2::new(
+                relative_x.clone() * grid_size + cell_x as f32 / TILE_COUNT_SQRT as f32,
+                relative_y.clone() * grid_size + cell_y as f32 / TILE_COUNT_SQRT as f32,
+            );
 
-            let x_d = seed_x - input[0];
-            let y_d = seed_y - input[1];
+            let d = (seed_point.clone() - input_point.clone()).length2();
 
-            let d_2 = x_d.pow2() + y_d.pow2();
-
-            if closest_d > d_2 {
+            if closest_d > d {
                 second_closest_d = closest_d;
                 second_closest_i = closest_i;
+                second_closest_point = closest_point;
 
-                closest_d = d_2;
+                closest_d = d;
                 closest_i = i;
-            } else if second_closest_d > d_2 {
-                second_closest_d = d_2;
+                closest_point = seed_point;
+            } else if second_closest_d > d {
+                second_closest_d = d;
                 second_closest_i = i;
+                second_closest_point = seed_point;
             }
         }
     }
 
-    let [_, _, closest_r, closest_g, closest_b] = cells[closest_i].clone();
+    let closest_col = get_color(&cells[closest_i]);
+    let second_closest_col = get_color(&cells[second_closest_i]);
 
-    if second_closest_d == 0. {
-        [closest_r.clone(), closest_g.clone(), closest_b.clone()]
+    let gradient_direction = closest_point.clone() - second_closest_point.clone();
+
+    let projected_closest_p = project_point_to_vector(closest_point, gradient_direction.clone());
+    let projected_second_closest_p =
+        project_point_to_vector(second_closest_point, gradient_direction.clone());
+    let projected_input = project_point_to_vector(input_point, gradient_direction);
+
+    let projected_closest_d = (projected_closest_p - projected_input.clone()).length();
+    let projected_second_closest_d = (projected_second_closest_p - projected_input).length();
+
+    let factor = projected_closest_d / projected_second_closest_d;
+
+    if factor < TILE_BIAS {
+        closest_col.into_array()
     } else {
-        let mix_factor = closest_d / second_closest_d;
-
-        if mix_factor <= TILE_BIAS {
-            [closest_r.clone(), closest_g.clone(), closest_b.clone()]
-        } else {
-            let [_, _, second_closest_r, second_closest_g, second_closest_b] =
-                cells[second_closest_i].clone();
-
-            let biased_mix_factor = if mix_factor < TILE_BIAS {
-                N::from(0.)
-            } else {
-                (mix_factor - TILE_BIAS) / (1. - TILE_BIAS) / 2.
-            };
-
-            let anti_biased_mix_factor = N::from(1.) - biased_mix_factor.clone();
-
-            [
-                (closest_r * anti_biased_mix_factor.clone())
-                    + (second_closest_r * biased_mix_factor.clone()),
-                (closest_g * anti_biased_mix_factor.clone())
-                    + (second_closest_g * biased_mix_factor.clone()),
-                (closest_b * anti_biased_mix_factor) + (second_closest_b * biased_mix_factor),
-            ]
-        }
+        let factor = (factor - TILE_BIAS) / (N::from(1.) - TILE_BIAS);
+        mix(
+            closest_col.clone(),
+            mix(closest_col, second_closest_col, N::from(0.5)),
+            factor,
+        )
+        .into_array()
     }
 }

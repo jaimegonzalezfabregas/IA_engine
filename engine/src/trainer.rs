@@ -115,6 +115,13 @@ impl<
         self.params.clone().map(|e| e.get_real())
     }
 
+    pub fn shake(&mut self, factor: f32) {
+        for i in 0..P {
+            self.params[i]
+                .set_real(self.params[i].get_real() + (rand::random::<f32>() - 0.5) * factor);
+        }
+    }
+
     pub fn new(
         trainable: F,
         trainable_gradient: FG,

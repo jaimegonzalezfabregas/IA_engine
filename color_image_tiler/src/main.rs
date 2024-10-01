@@ -7,6 +7,7 @@ mod seed;
 mod stats_visualizer_thread;
 mod tiler;
 mod training_thread;
+mod dataset_sample_service;
 
 use std::{array, sync::mpsc::channel, thread, time::SystemTime};
 
@@ -21,13 +22,13 @@ use seed::Seed;
 use stats_visualizer_thread::stats_thread;
 use training_thread::train_thread;
 
-const TILE_COUNT_SQRT: usize = 20;
+const TILE_COUNT_SQRT: usize = 3;
 const TILE_COUNT: usize = TILE_COUNT_SQRT * TILE_COUNT_SQRT;
 const TILE_BIAS: f32 = 0.5;
-const PARTICLE_FREEDOM: isize = 2;
+const PARTICLE_FREEDOM: isize = 1;
 
 const ACCELERATED: bool = true;
-const RES_2D: usize = 150;
+const RES_2D: usize = TILE_COUNT_SQRT * 5;
 
 gfx_vertex_struct!(Vertex {
     a_pos: [i8; 4] = "a_pos",
