@@ -22,7 +22,7 @@ use seed::Seed;
 use stats_visualizer_thread::stats_thread;
 use training_thread::train_thread;
 
-const TILE_COUNT_SQRT: usize = 3;
+const TILE_COUNT_SQRT: usize = 20;
 const TILE_COUNT: usize = TILE_COUNT_SQRT * TILE_COUNT_SQRT;
 const TILE_BIAS: f32 = 0.5;
 const PARTICLE_FREEDOM: isize = 1;

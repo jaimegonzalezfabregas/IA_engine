@@ -87,18 +87,31 @@ pub fn tiler<
         }
     }
 
+    assert_ne!(closest_i, second_closest_i);
+
     let closest_col = get_color(&cells[closest_i]);
+
+
+    if closest_point.x == second_closest_point.x && closest_point.y == second_closest_point.y {
+       return closest_col.into_array()   
+    }
+
     let second_closest_col = get_color(&cells[second_closest_i]);
 
     let gradient_direction = closest_point.clone() - second_closest_point.clone();
+
 
     let projected_closest_p = project_point_to_vector(closest_point, gradient_direction.clone());
     let projected_second_closest_p =
         project_point_to_vector(second_closest_point, gradient_direction.clone());
     let projected_input = project_point_to_vector(input_point, gradient_direction);
 
-    let projected_closest_d = (projected_closest_p - projected_input.clone()).length();
-    let projected_second_closest_d = (projected_second_closest_p - projected_input).length();
+    let projected_closest_d = (projected_closest_p - projected_input.clone()).length2();
+    let projected_second_closest_d = (projected_second_closest_p - projected_input).length2();
+
+    if projected_second_closest_d == N::from(0.){
+        return closest_col.into_array()
+    }
 
     let factor = projected_closest_d / projected_second_closest_d;
 
@@ -108,8 +121,8 @@ pub fn tiler<
         let factor = (factor - TILE_BIAS) / (N::from(1.) - TILE_BIAS);
         mix(
             closest_col.clone(),
-            mix(closest_col, second_closest_col, N::from(0.5)),
-            factor,
+            second_closest_col,
+            factor / N::from(2.0),
         )
         .into_array()
     }

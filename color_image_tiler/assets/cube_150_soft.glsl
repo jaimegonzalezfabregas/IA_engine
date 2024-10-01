@@ -43,7 +43,7 @@ void main() {
 
     if (inner_coord_x < 0.03 ||
             inner_coord_y < 0.03) {
-        o_Color = vec4(1, 0, 1, 0);
+        o_Color = vec4(1, 0, 1, 1);
         return;
     }
 
@@ -103,7 +103,7 @@ void main() {
         o_Color = closest_col;
     } else {
         factor = (factor - TILE_BIAS) / (1 - TILE_BIAS);
-        o_Color = mix(closest_col second_closest_col, factor / 2);
+        o_Color = mix(closest_col, second_closest_col, factor / 2);
     }
 
     // o_Color = vec4(factor,0,0,1);

@@ -1,8 +1,11 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    fmt::Debug,
+    ops::{Add, Div, Mul, Sub},
+};
 
 use ia_engine::dual::extended_arithmetic::ExtendedArithmetic;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Vec2<N> {
     pub x: N,
     pub y: N,
@@ -30,7 +33,7 @@ impl<N: Sub<Output = N>> Sub<Vec2<N>> for Vec2<N> {
     }
 }
 
-impl<N: From<f32> + ExtendedArithmetic + Add<N, Output = N>> Vec2<N> {
+impl<N: From<f32> + ExtendedArithmetic + Add<N, Output = N> + Debug + PartialEq> Vec2<N> {
     pub fn zero() -> Self {
         Self {
             x: N::from(0.),
@@ -43,13 +46,14 @@ impl<N: From<f32> + ExtendedArithmetic + Add<N, Output = N>> Vec2<N> {
     }
 
     pub fn length(self) -> N {
+        assert!(self.x != N::from(0.) || self.y != N::from(0.), "{self:?}");
+
         self.length2().sqrt()
     }
 
     pub fn length2(self) -> N {
         self.x.pow2() + self.y.pow2()
     }
-
 }
 
 pub fn dot<N: Clone + Add<N, Output = N> + Mul<N, Output = N>>(p: Vec2<N>, v: Vec2<N>) -> N {
@@ -57,7 +61,13 @@ pub fn dot<N: Clone + Add<N, Output = N> + Mul<N, Output = N>>(p: Vec2<N>, v: Ve
 }
 
 fn normalize<
-    N: Clone + From<f32> + Add<N, Output = N> + Div<N, Output = N> + ExtendedArithmetic + PartialEq,
+    N: Clone
+        + Debug
+        + From<f32>
+        + Add<N, Output = N>
+        + Div<N, Output = N>
+        + ExtendedArithmetic
+        + PartialEq,
 >(
     mut v: Vec2<N>,
 ) -> Vec2<N> {
@@ -76,10 +86,10 @@ fn normalize<
 
 pub fn project_point_to_vector<
     N: Clone
+        + Debug
         + From<f32>
         + PartialEq
         + Add<N, Output = N>
-        + Sub<N, Output = N>
         + Mul<N, Output = N>
         + Div<N, Output = N>
         + ExtendedArithmetic,
