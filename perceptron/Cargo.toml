@@ -1,0 +1,10 @@
+[package]
+name = "perceptron"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+byteorder = "1.5.0"
+ia_engine = { path = "../engine" } 
+idx_parser = "0.3.0"
+flate2 = "1.0.34"

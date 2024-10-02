@@ -60,7 +60,7 @@ void main() {
 
             vec4 relative = texture(t_point, vec2((i + .5) / TILE_COUNT, 0));
 
-            vec2 seed = vec2(relative.x * grid_size + float(cell_x) / TILE_COUNT_SQRT, relative.y * grid_size + float(cell_y) / TILE_COUNT_SQRT);
+            vec2 seed = vec2(relative.x * 0.9 * grid_size + float(cell_x) / TILE_COUNT_SQRT, relative.y* 0.9 * grid_size + float(cell_y) / TILE_COUNT_SQRT);
 
             float d = length(seed - input_point);
 

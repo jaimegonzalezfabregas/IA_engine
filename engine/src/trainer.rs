@@ -61,7 +61,7 @@ fn dataset_cost<
 ) -> N {
     let mut accumulator = N::from(0.);
     let cost_list = dataset
-        .iter()
+        .par_iter()
         // .progress_count(dataset.len() as u64)
         .map(|data_point| {
             let prediction = (model)(&params, &data_point.input, &extra);

@@ -43,7 +43,7 @@ fn main() {
 
         let params = trainer.get_model_params();
 
-        println!("{params:?}");
+        // println!("{params:?}");
 
         let root = b.into_drawing_area();
         root.fill(&WHITE)?;

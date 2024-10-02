@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "hello_world"
+		},
+		{
+			"path": "perceptron"
 		}
 	],
 	"settings": {
