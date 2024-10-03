@@ -111,12 +111,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "idx_parser"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c62cc305c4b7c9f3374abdec054b50e587a2c064b44f989ba6f72b74efb211ea"
-
-[[package]]
 name = "indicatif"
 version = "0.17.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -173,7 +167,8 @@ dependencies = [
  "byteorder",
  "flate2",
  "ia_engine",
- "idx_parser",
+ "rand",
+ "rand_chacha",
 ]
 
 [[package]]

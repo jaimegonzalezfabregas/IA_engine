@@ -1,4 +1,4 @@
-#![feature(generic_arg_infer)]
+// #![feature(generic_arg_infer)]
 
 pub mod dual;
 pub mod simd_arr;

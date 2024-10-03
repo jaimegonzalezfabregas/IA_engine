@@ -10,7 +10,7 @@ mod dual_tests {
 
     #[test]
     fn create() {
-        let dual: Dual<4, HybridSimd<_, 4>> = Dual::zero();
+        let dual: Dual<4, HybridSimd<4, 4>> = Dual::zero();
 
         assert_eq!(dual.real, 0.)
     }
@@ -23,8 +23,8 @@ mod dual_tests {
             let scalar_a = rng.gen();
             let scalar_b = rng.gen();
 
-            let a: Dual<4, HybridSimd<_, 4>> = Dual::new(scalar_a);
-            let b: Dual<4, HybridSimd<_, 4>> = Dual::new(scalar_b);
+            let a: Dual<4, HybridSimd<4, 4>> = Dual::new(scalar_a);
+            let b: Dual<4, HybridSimd<4, 4>> = Dual::new(scalar_b);
 
             assert_eq!(scalar_a.sqrt(), (a.clone().sqrt()).get_real());
             assert_eq!(-scalar_a, (a.clone().neg()).get_real());

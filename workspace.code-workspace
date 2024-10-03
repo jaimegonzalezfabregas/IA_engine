@@ -4,15 +4,6 @@
 			"path": "engine"
 		},
 		{
-			"path": "color_image_tiler"
-		},
-		{
-			"path": "polinomials"
-		},
-		{
-			"path": "hello_world"
-		},
-		{
 			"path": "perceptron"
 		}
 	],

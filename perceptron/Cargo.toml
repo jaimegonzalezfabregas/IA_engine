@@ -3,8 +3,12 @@ name = "perceptron"
 version = "0.1.0"
 edition = "2021"
 
+[toolchain]
+channel = "nightly"
+
 [dependencies]
 byteorder = "1.5.0"
 ia_engine = { path = "../engine" } 
-idx_parser = "0.3.0"
 flate2 = "1.0.34"
+rand = "0.8.5"
+rand_chacha = "0.3.1"

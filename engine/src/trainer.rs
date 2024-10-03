@@ -3,6 +3,8 @@ use std::ops::{Add, Div, Sub};
 
 use crate::dual::extended_arithmetic::ExtendedArithmetic;
 use crate::dual::Dual;
+use crate::simd_arr::dense_simd::DenseSimd;
+use crate::simd_arr::hybrid_simd::HybridSimd;
 use crate::simd_arr::SimdArr;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -98,6 +100,80 @@ pub struct Trainer<
     params: [Dual<P, S>; P],
     param_translator: ParamTranslate,
     extra_data: ExtraData,
+    last_cost: Option<f32>,
+}
+
+impl<
+        const P: usize,
+        const I: usize,
+        const O: usize,
+        ExtraData: Sync + Clone,
+        FG: Fn(&[Dual<P, DenseSimd<P>>; P], &[f32; I], &ExtraData) -> [Dual<P, DenseSimd<P>>; O] + Sync,
+        F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync,
+        ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
+    > Trainer<P, I, O, ExtraData, DenseSimd<P>, FG, F, ParamTranslate>
+{
+    pub fn new_dense(
+        trainable: F,
+        trainable_gradient: FG,
+        param_translator: ParamTranslate,
+        extra_data: ExtraData,
+    ) -> Self {
+        rayon::ThreadPoolBuilder::new()
+            .stack_size(1 * 1024 * 1024 * 1024)
+            .build_global()
+            .unwrap();
+
+        let mut rng = ChaCha8Rng::seed_from_u64(2);
+
+        Self {
+            model_gradient: trainable_gradient,
+            model: trainable,
+            params: array::from_fn(|i| Dual::new_param(rng.gen(), i)),
+            param_translator,
+            extra_data,
+            last_cost: None,
+        }
+    }
+}
+
+impl<
+        const P: usize,
+        const I: usize,
+        const O: usize,
+        ExtraData: Sync + Clone,
+        FG: Fn(
+                &[Dual<P, HybridSimd<P, 10>>; P],
+                &[f32; I],
+                &ExtraData,
+            ) -> [Dual<P, HybridSimd<P, 10>>; O]
+            + Sync,
+        F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync,
+        ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
+    > Trainer<P, I, O, ExtraData, HybridSimd<P, 10>, FG, F, ParamTranslate>
+{
+    pub fn new_hybrid(
+        trainable: F,
+        trainable_gradient: FG,
+        param_translator: ParamTranslate,
+        extra_data: ExtraData,
+    ) -> Self {
+        rayon::ThreadPoolBuilder::new()
+            .stack_size(1 * 1024 * 1024 * 1024)
+            .build_global()
+            .unwrap();
+
+        let mut rng = ChaCha8Rng::seed_from_u64(2);
+
+        Self {
+            model_gradient: trainable_gradient,
+            model: trainable,
+            params: array::from_fn(|i| Dual::new_param(rng.gen(), i)),
+            param_translator,
+            extra_data,
+            last_cost: None,
+        }
+    }
 }
 
 impl<
@@ -119,28 +195,6 @@ impl<
         for i in 0..P {
             self.params[i]
                 .set_real(self.params[i].get_real() + (rand::random::<f32>() - 0.5) * factor);
-        }
-    }
-
-    pub fn new(
-        trainable: F,
-        trainable_gradient: FG,
-        param_translator: ParamTranslate,
-        extra_data: ExtraData,
-    ) -> Self {
-        rayon::ThreadPoolBuilder::new()
-            .stack_size(1 * 1024 * 1024 * 1024)
-            .build_global()
-            .unwrap();
-
-        let mut rng = ChaCha8Rng::seed_from_u64(2);
-
-        Self {
-            model_gradient: trainable_gradient,
-            model: trainable,
-            params: array::from_fn(|i| Dual::new_param(rng.gen(), i)),
-            param_translator,
-            extra_data,
         }
     }
 
@@ -178,16 +232,9 @@ impl<
             }
 
             let new_cost: f32 = dataset_cost(dataset, &new_params, &self.model, &self.extra_data);
+            self.last_cost = Some(new_cost);
 
-            // println!("  new cost: {}, old_cost: {}", new_cost, cost.get_real());
-
-            if new_cost > cost.get_real() {
-                true
-            } else {
-                // println!("commiting step");
-
-                false
-            }
+            new_cost > cost.get_real()
         } {
             factor /= 2.;
 
@@ -201,7 +248,7 @@ impl<
     // TODO
 
     pub fn get_last_cost(&self) -> Option<f32> {
-        None
+        self.last_cost
     }
 
     pub fn eval(&self, input: &[f32; I]) -> [f32; O] {
