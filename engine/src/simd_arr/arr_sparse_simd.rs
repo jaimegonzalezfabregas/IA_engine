@@ -4,18 +4,18 @@ use std::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct SparseSimd<const CAPACITY: usize, const VIRTUALSIZE: usize> {
+pub struct ArrSparseSimd<const CAPACITY: usize, const VIRTUALSIZE: usize> {
     data_index: [usize; CAPACITY],
     data: [f32; CAPACITY],
     size: usize,
 }
-impl<const CAPACITY: usize, const VIRTUALSIZE: usize> SparseSimd<CAPACITY, VIRTUALSIZE> {
+impl<const CAPACITY: usize, const VIRTUALSIZE: usize> ArrSparseSimd<CAPACITY, VIRTUALSIZE> {
     pub const fn non_zero_count(&self) -> usize {
         self.size
     }
 }
 
-impl<const CAPACITY: usize, const S: usize> SparseSimd<CAPACITY, S> {
+impl<const CAPACITY: usize, const S: usize> ArrSparseSimd<CAPACITY, S> {
     pub fn new_from_array(arr: &[f32; S]) -> Option<Self> {
         let mut cursor = 0;
         let mut ret = Self::zero();
@@ -34,7 +34,7 @@ impl<const CAPACITY: usize, const S: usize> SparseSimd<CAPACITY, S> {
         Some(ret)
     }
 
-    pub fn zero() -> SparseSimd<CAPACITY, S> {
+    pub fn zero() -> ArrSparseSimd<CAPACITY, S> {
         Self {
             data_index: [S; CAPACITY],
             data: [0.; CAPACITY],
@@ -72,12 +72,10 @@ impl<const CAPACITY: usize, const S: usize> SparseSimd<CAPACITY, S> {
         ret
     }
 
-    pub fn neg(mut self) -> Self {
+    pub fn neg(&mut self) {
         for i in 0..self.size {
             self.data[i] *= -1.;
         }
-
-        self
     }
 
     pub fn acumulate(&mut self, rhs: &Self) -> Result<(), ()> {
@@ -91,7 +89,7 @@ impl<const CAPACITY: usize, const S: usize> SparseSimd<CAPACITY, S> {
             self.size = rhs.size;
             Ok(())
         } else {
-            let mut ret: SparseSimd<CAPACITY, S> = SparseSimd {
+            let mut ret: ArrSparseSimd<CAPACITY, S> = ArrSparseSimd {
                 data_index: [S; CAPACITY],
                 data: [0.; CAPACITY],
                 size: 0,
@@ -159,7 +157,7 @@ impl<const CAPACITY: usize, const S: usize> SparseSimd<CAPACITY, S> {
 }
 
 impl<const CAPACITY: usize, const VIRTUALSIZE: usize> Index<usize>
-    for SparseSimd<CAPACITY, VIRTUALSIZE>
+    for ArrSparseSimd<CAPACITY, VIRTUALSIZE>
 {
     type Output = f32;
     fn index(&self, index: usize) -> &Self::Output {
@@ -173,7 +171,7 @@ impl<const CAPACITY: usize, const VIRTUALSIZE: usize> Index<usize>
 }
 
 impl<const CAPACITY: usize, const VIRTUALSIZE: usize> IndexMut<usize>
-    for SparseSimd<CAPACITY, VIRTUALSIZE>
+    for ArrSparseSimd<CAPACITY, VIRTUALSIZE>
 {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         let dereference_index = self.data_index.partition_point(|i| *i < index);
@@ -199,13 +197,13 @@ mod sparse_simd_tests {
     use rand_chacha::ChaCha8Rng;
     use std::array::from_fn;
 
-    use crate::simd_arr::sparse_simd::SparseSimd;
+    use crate::simd_arr::arr_sparse_simd::ArrSparseSimd;
 
     #[test]
     fn test_create() {
         assert_eq!(
-            SparseSimd::<4, 4>::new_from_array(&[1., 4., 2., 4.]).unwrap(),
-            SparseSimd {
+            ArrSparseSimd::<4, 4>::new_from_array(&[1., 4., 2., 4.]).unwrap(),
+            ArrSparseSimd {
                 data_index: [0, 1, 2, 3],
                 data: [1., 4., 2., 4.],
                 size: 4
@@ -213,8 +211,8 @@ mod sparse_simd_tests {
         );
 
         assert_eq!(
-            SparseSimd::<7, 7>::new_from_array(&[1., 4., 0., 0., 0., 2., 4.]).unwrap(),
-            SparseSimd {
+            ArrSparseSimd::<7, 7>::new_from_array(&[1., 4., 0., 0., 0., 2., 4.]).unwrap(),
+            ArrSparseSimd {
                 data_index: [0, 1, 5, 6, 7, 7, 7],
                 data: [1., 4., 2., 4., 0., 0., 0.],
                 size: 4
@@ -230,8 +228,8 @@ mod sparse_simd_tests {
             .collect::<Vec<_>>();
         let res: [f32; N] = from_fn(|i| res_vec[i]);
 
-        let mut x = SparseSimd::<N, N>::new_from_array(&a).unwrap();
-        let y = SparseSimd::<N, N>::new_from_array(&b).unwrap();
+        let mut x = ArrSparseSimd::<N, N>::new_from_array(&a).unwrap();
+        let y = ArrSparseSimd::<N, N>::new_from_array(&b).unwrap();
 
         x.acumulate(&y).unwrap();
 
@@ -246,8 +244,9 @@ mod sparse_simd_tests {
             .collect::<Vec<_>>();
         let res: [f32; N] = from_fn(|i| res_vec[i]);
 
-        let mut x = SparseSimd::<N, N>::new_from_array(&a).unwrap();
-        let y = SparseSimd::<N, N>::new_from_array(&b).unwrap().neg();
+        let mut x = ArrSparseSimd::<N, N>::new_from_array(&a).unwrap();
+        let mut y = ArrSparseSimd::<N, N>::new_from_array(&b).unwrap();
+        y.neg();
 
         x.acumulate(&y).unwrap();
 
@@ -278,7 +277,7 @@ mod sparse_simd_tests {
 
             assert_eq!(
                 a,
-                SparseSimd::<32, 32>::new_from_array(&a).unwrap().to_array()
+                ArrSparseSimd::<32, 32>::new_from_array(&a).unwrap().to_array()
             )
         }
     }
@@ -286,7 +285,7 @@ mod sparse_simd_tests {
     fn test_mul_scalar<const N: usize>(a: [f32; N], b: f32) {
         let res = a.map(|a_elm| a_elm * b);
 
-        let mut test = SparseSimd::<N, N>::new_from_array(&a).unwrap();
+        let mut test = ArrSparseSimd::<N, N>::new_from_array(&a).unwrap();
         test.multiply(b);
 
         assert_eq!(test.to_array(), res)
@@ -295,7 +294,7 @@ mod sparse_simd_tests {
     fn test_div_scalar<const N: usize>(a: [f32; N], b: f32) {
         let res = a.map(|a_elm| a_elm * (1. / b)); // good enough
 
-        let mut test = SparseSimd::<N, N>::new_from_array(&a).unwrap();
+        let mut test = ArrSparseSimd::<N, N>::new_from_array(&a).unwrap();
         test.multiply(1. / b);
 
         assert_eq!(test.to_array(), res)
@@ -319,7 +318,7 @@ mod sparse_simd_tests {
         for i in 0..10 {
             let mut test_arr = [0.; 10];
             test_arr[i] = 1.;
-            let x = SparseSimd::<10, 10>::new_from_array(&test_arr).unwrap();
+            let x = ArrSparseSimd::<10, 10>::new_from_array(&test_arr).unwrap();
 
             for j in 0..10 {
                 if i == j {
@@ -340,7 +339,7 @@ mod sparse_simd_tests {
             let cero_ratio: f32 = rng.gen();
             let a: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
 
-            let mut x: SparseSimd<4, 4> = SparseSimd::zero();
+            let mut x: ArrSparseSimd<4, 4> = ArrSparseSimd::zero();
             let mut order = (0..4).collect::<Vec<_>>();
             order.shuffle(&mut rng);
             for i in order {
@@ -362,7 +361,7 @@ mod sparse_simd_tests {
             let a: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
             let b: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
 
-            let mut y = SparseSimd::<4, 4>::new_from_array(&b).unwrap();
+            let mut y = ArrSparseSimd::<4, 4>::new_from_array(&b).unwrap();
             let mut order = (0..4).collect::<Vec<_>>();
             order.shuffle(&mut rng);
             for i in order {
@@ -384,8 +383,8 @@ mod sparse_simd_tests {
             let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
             let b: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
 
-            let mut x: SparseSimd<32, 32> = SparseSimd::zero();
-            let mut y: SparseSimd<32, 32> = SparseSimd::new_from_array(&b).unwrap();
+            let mut x: ArrSparseSimd<32, 32> = ArrSparseSimd::zero();
+            let mut y: ArrSparseSimd<32, 32> = ArrSparseSimd::new_from_array(&b).unwrap();
             let mut order = (0..32).collect::<Vec<_>>();
             order.shuffle(&mut rng);
             for i in order {
@@ -403,7 +402,7 @@ mod sparse_simd_tests {
     #[test]
     fn test_indexing_mut() {
         for i in 0..10 {
-            let mut x = SparseSimd::<10, 10>::new_from_array(&[0.; 10]).unwrap();
+            let mut x = ArrSparseSimd::<10, 10>::new_from_array(&[0.; 10]).unwrap();
             x[i] = 1.;
 
             for j in 0..10 {
@@ -419,7 +418,7 @@ mod sparse_simd_tests {
     #[test]
     fn test_optimistic_allocation() {
         let test = [1., 0., 0., 2., 0., 0., 1., 3., 0., 9.];
-        let x = SparseSimd::<5, 10>::new_from_array(&test).unwrap();
+        let x = ArrSparseSimd::<5, 10>::new_from_array(&test).unwrap();
 
         assert_eq!(x.to_array(), test);
     }

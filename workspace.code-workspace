@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "perceptron"
+		},
+		{
+			"path": "color_image_tiler"
 		}
 	],
 	"settings": {

@@ -5,7 +5,9 @@ use std::{
 
 pub mod dense_simd;
 pub mod hybrid_simd;
-pub mod sparse_simd;
+pub mod arr_sparse_simd;
+pub mod heap_hybrid_simd;
+mod vec_sparse_simd;
 
 pub trait SimdArr<const S: usize>:
     Debug + Sized + Send + Sync + Index<usize, Output = f32> + IndexMut<usize, Output = f32> + Clone
@@ -16,7 +18,7 @@ pub trait SimdArr<const S: usize>:
 
     fn zero() -> Self;
 
-    fn neg(self) -> Self;
+    fn neg(&mut self); 
 
     fn to_array(&self) -> [f32; S];
 

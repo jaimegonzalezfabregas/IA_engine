@@ -2,7 +2,6 @@
 #![feature(generic_arg_infer)]
 #![feature(test)]
 
-mod bench;
 mod seed;
 mod stats_visualizer_thread;
 mod tiler;

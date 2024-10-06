@@ -1,114 +1,133 @@
-use std::array;
+use std::fmt::Debug;
 use std::ops::Add;
 use std::ops::Mul;
 
+use ia_engine::dual::extended_arithmetic::ExtendedArithmetic;
 use rand::Rng;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Matrix<const ROWS: usize, const COLS: usize, T> {
-    data: [[T; COLS]; ROWS],
-}
-impl<const W: usize, const H: usize, N: From<f32>> Matrix<H, W, N> {
+pub struct Matrix<T>(Vec<Vec<T>>);
+
+impl<N: From<f32> + Clone + Debug> Matrix<N> {
     pub fn delinearize<F: Fn(&mut N)>(&mut self, delinearizer: F) {
-        for y in 0..H {
-            for x in 0..W {
-                delinearizer(&mut self.data[y][x]);
+        for y in 0..self.0.len() {
+            for x in 0..self.0[y].len() {
+                delinearizer(&mut self.0[y][x]);
             }
         }
     }
 
-    pub fn new(data: [[N; W]; H]) -> Self {
-        Matrix { data }
+    pub fn new<const W: usize, const H: usize>(data: [[N; W]; H]) -> Self {
+        let data = data
+            .iter()
+            .map(|row| row.to_vec()) // Convert each row from an array to a Vec
+            .collect(); // Collect into a Vec<Vec<N>>
+
+        Matrix(data)
     }
 
-    pub fn cero() -> Self {
-        let data = array::from_fn(|_| array::from_fn(|_| N::from(0.)));
-        Matrix { data }
+    pub fn cero(width: usize, height: usize) -> Self {
+        let data = (0..height)
+            .map(|_| (0..width).map(|_| N::from(0.)).collect())
+            .collect();
+        Matrix(data)
     }
-}
 
-impl<
-        const W: usize,
-        const H: usize,
-        N: Mul<N, Output = N> + Add<N, Output = N> + From<f32> + Clone,
-    > Matrix<H, W, N>
-{
-    pub fn from_flat(flat_data: &[N]) -> Self {
-        assert_eq!(flat_data.len(), W * H);
-        
-        Matrix {
-            data: array::from_fn(|y| array::from_fn(|x| flat_data[y * W * x].clone())),
-        }
-    }
-}
-
-impl<const H: usize, N: Clone> Matrix<H, 1, N> {
-    pub fn as_array(self) -> [N; H] {
-        array::from_fn(|y| self.data[y][1].clone())
-    }
-}
-
-impl<const W: usize, const H: usize> Matrix<H, W, f32> {
-    pub fn rand<R: Rng>(generator: &mut R) -> Self {
-        let data = array::from_fn(|_| array::from_fn(|_| generator.gen()));
-        Matrix { data }
-    }
-}
-
-impl<const S: usize, N: Clone + Mul<N, Output = N> + Add<N, Output = N> + From<f32>>
-    Matrix<S, S, N>
-{
-    pub fn unit() -> Self {
-        let mut ret = Self::cero();
-        for i in 0..S {
-            ret.data[i][i] = N::from(1.0);
+    pub fn unit(size: usize) -> Self {
+        let mut ret = Self::cero(size, size);
+        for i in 0..size {
+            ret.0[i][i] = N::from(1.0);
         }
         ret
     }
 
-    pub fn hola(&self) -> usize {
-        0
+    pub fn deserialize(width: usize, height: usize, flat_data: &[N]) -> Self {
+        assert_eq!(flat_data.len(), width * height);
+
+        Matrix(
+            (0..height)
+                .map(|y| {
+                    (0..width)
+                        .map(|x| flat_data[y * width + x].clone())
+                        .collect()
+                })
+                .collect(),
+        )
+    }
+
+    // Pretty print the matrix
+    pub fn pretty_print(&self) {
+        for row in &self.0 {
+            let row_str: Vec<String> = row.iter().map(|val| format!("{:?}", val)).collect();
+            println!("[{}]", row_str.join(", "));
+        }
+    }
+
+    pub fn add_bias(mut self) -> Matrix<N> {
+        self.0.push(vec![N::from(1.)]);
+
+        self
+    }
+
+    pub fn serialize(self) -> Vec<N> {
+        self.0.into_iter().flat_map(|x| x).collect()
+    }
+
+    pub fn rows(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn cols(&self) -> usize {
+        self.0[0].len()
     }
 }
 
-impl<const L: usize, const M: usize, const N: usize, T> Mul<Matrix<M, L, T>> for Matrix<N, M, T>
+impl Matrix<f32> {
+    pub fn rand<R: Rng>(width: usize, height: usize, generator: &mut R) -> Self {
+        let data: Vec<Vec<f32>> = (0..height)
+            .map(|_| (0..width).map(|_| generator.gen()).collect())
+            .collect();
+        Matrix(data)
+    }
+}
+
+impl<T> Mul for Matrix<T>
 where
-    T: Mul<Output = T> + Add<Output = T> + From<f32> + Clone,
+    T: std::ops::Add<Output = T>
+        + std::ops::Mul<Output = T>
+        + From<f32>
+        + Clone
+        + ExtendedArithmetic
+        + Debug,
 {
-    type Output = Matrix<N, L, T>;
+    type Output = Matrix<T>;
 
-    fn mul(self, rhs: Matrix<M, L, T>) -> Self::Output {
-        let mut result = Matrix::<N, L, T>::cero();
+    fn mul(self, rhs: Matrix<T>) -> Matrix<T> {
 
-        for i in 0..N {
-            for j in 0..L {
-                for k in 0..M {
-                    result.data[i][j] = result.data[i][j].clone()
-                        + (self.data[i][k].clone() * rhs.data[k][j].clone());
+        let m = self.rows();
+        let n = self.cols();
+        let p = rhs.cols();
+
+        // Ensure the matrices can be multiplied
+        assert_eq!(
+            n,
+            rhs.rows(),
+            "Incompatible matrix sizes for multiplication"
+        );
+
+        // Create a new matrix to hold the result
+        let mut ret: Matrix<T> = Matrix::cero(p, m);
+
+        // Perform matrix multiplication
+        for i in 0..m {
+            for j in 0..p {
+                for k in 0..n {
+                    ret.0[i][j].accumulate(self.0[i][k].clone() * rhs.0[k][j].clone())
                 }
             }
         }
 
-        result
-    }
-}
-
-impl<const N: usize, const M: usize, T> Add for Matrix<N, M, T>
-where
-    T: Add<Output = T> + Clone + From<f32>,
-{
-    type Output = Matrix<N, M, T>;
-
-    fn add(self, rhs: Matrix<N, M, T>) -> Self::Output {
-        let mut result = Matrix::<N, M, T>::cero();
-
-        for i in 0..N {
-            for j in 0..M {
-                result.data[i][j] = self.data[i][j].clone() + rhs.data[i][j].clone();
-            }
-        }
-
-        result
+        ret
     }
 }
 
@@ -124,10 +143,10 @@ mod matrix_tests {
         let mut rand = ChaChaRng::seed_from_u64(0);
 
         for _ in 0..100 {
-            let unit3 = Matrix::unit();
-            let unit4 = Matrix::unit();
-            let a: Matrix<3, 3, f32> = Matrix::rand(&mut rand);
-            let b: Matrix<3, 3, f32> = Matrix::rand(&mut rand);
+            let unit3 = Matrix::unit(3);
+            let unit4 = Matrix::unit(3);
+            let a: Matrix<f32> = Matrix::rand(3, 3, &mut rand);
+            let b: Matrix<f32> = Matrix::rand(3, 3, &mut rand);
 
             assert_eq!(a, a.clone() * unit3.clone());
             assert_eq!(a, unit4 * a.clone());
@@ -164,7 +183,7 @@ mod matrix_tests {
     }
 
     #[test]
-    fn test_multiplication_papa() {
+    fn test_multiplication_c() {
         let a = Matrix::new([[1., 2., 3.], [3., 4., 0.]]);
         let b = Matrix::new([[7., 8.], [7., 9.], [9., 8.]]);
 

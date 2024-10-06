@@ -1,9 +1,6 @@
 use std::{array, sync::mpsc::Sender};
 
-use ia_engine::{
-    simd_arr::{hybrid_simd::HybridSimd, SimdArr},
-    trainer::Trainer,
-};
+use ia_engine::trainer::{CriticalityCue, Trainer};
 
 use crate::{
     dataset_sample_service::DatasetSampleService, tiler, TrainerComunicationCodes, TILE_COUNT,
@@ -18,16 +15,22 @@ pub fn train_thread(
     tx: Sender<TrainerComunicationCodes<([f32; TILE_COUNT * 5], (Option<f32>, usize))>>,
     max_iterations: Option<usize>,
 ) {
-    train_work::<HybridSimd<_, { TILE_COUNT * 2 }>>(Some(tx), max_iterations);
+    train_work(Some(tx), max_iterations);
     // train_work::<DenseSimd<_>>(Some(tx), max_iterations);
 }
 
-pub(crate) fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
+pub(crate) fn train_work(
     tx: Option<Sender<TrainerComunicationCodes<([f32; TILE_COUNT * 5], (Option<f32>, usize))>>>,
     max_iterations: Option<usize>,
 ) {
-    let mut trainer: Trainer<_, _, _, _, S, _, _, _> =
-        Trainer::new(tiler, tiler, max_speed_param_translator, ());
+    let mut trainer = Trainer::new_heap_hybrid(
+        CriticalityCue::<{ TILE_COUNT / 2 }>(),
+        tiler,
+        tiler,
+        max_speed_param_translator,
+        (),
+    );
+
     if let Some(ref tx) = tx {
         tx.send(TrainerComunicationCodes::Msg((
             trainer.get_model_params(),
@@ -58,7 +61,7 @@ pub(crate) fn train_work<S: SimdArr<{ TILE_COUNT * 5 }>>(
             return;
         }
 
-        if !trainer.train_step(&pixels) {
+        if !trainer.train_step::<true>(&pixels) {
             local_minimum_count += 1;
             trainer.shake(0.1);
         } else {

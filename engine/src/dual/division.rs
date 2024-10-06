@@ -11,7 +11,8 @@ impl<const P: usize, S: SimdArr<P>> Div<Dual<P, S>> for Dual<P, S> {
         self.sigma.multiply(rhs.real);
         rhs.sigma.multiply(self.real);
 
-        self.sigma.acumulate(&rhs.sigma.neg());
+        rhs.sigma.neg();
+        self.sigma.acumulate(&rhs.sigma);
 
         self.sigma.multiply(1. / (rhs.real * rhs.real));
 

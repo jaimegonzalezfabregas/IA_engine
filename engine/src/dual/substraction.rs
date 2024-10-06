@@ -7,9 +7,10 @@ use super::{check_nan, Dual};
 impl<const P: usize, S: SimdArr<P>> Sub<Dual<P, S>> for Dual<P, S> {
     type Output = Dual<P, S>;
 
-    fn sub(mut self, rhs: Dual<P, S>) -> Self::Output {
+    fn sub(mut self, mut rhs: Dual<P, S>) -> Self::Output {
         self.real -= &rhs.real;
-        self.sigma.acumulate(&rhs.sigma.neg());
+        rhs.sigma.neg();
+        self.sigma.acumulate(&rhs.sigma);
 
         check_nan(self)
     }
