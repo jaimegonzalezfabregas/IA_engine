@@ -1,5 +1,8 @@
-use std::array;
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufRead, Write};
 use std::ops::{Add, Div, Sub};
+use std::path::Path;
+use std::{array, fs};
 
 use crate::dual::extended_arithmetic::ExtendedArithmetic;
 use crate::dual::Dual;
@@ -46,6 +49,8 @@ fn datapoint_cost<
 }
 
 fn dataset_cost<
+    'a,
+    'b,
     const PARALELIZE: bool,
     const P: usize,
     const I: usize,
@@ -62,8 +67,11 @@ fn dataset_cost<
         + Send
         + Sync,
     F: Fn(&[N; P], &[f32; I], &ExtraData) -> [N; O] + Sync,
+    D: IntoIterator<Item = &'b DataPoint<P, I, O>>
+        + IntoParallelIterator<Item = &'a DataPoint<P, I, O>>,
 >(
-    dataset: &Vec<DataPoint<P, I, O>>,
+    dataset: D,
+    dataset_len: usize,
     params: &[N; P],
     model: F,
     extra: &ExtraData,
@@ -71,21 +79,21 @@ fn dataset_cost<
     let mut accumulator = N::from(0.);
     let cost_list = if PARALELIZE {
         dataset
-            .par_iter()
-            .progress_count(dataset.len() as u64)
+            .into_par_iter()
+            .progress_count(dataset_len as u64)
             .map(|data_point| {
                 let prediction = (model)(&params, &data_point.input, &extra);
 
-                datapoint_cost(data_point, prediction)
+                datapoint_cost(&data_point, prediction)
             })
             .collect::<Vec<_>>()
     } else {
         dataset
-            .iter()
+            .into_iter()
             .map(|data_point| {
                 let prediction = (model)(&params, &data_point.input, &extra);
 
-                datapoint_cost(data_point, prediction)
+                datapoint_cost(&data_point, prediction)
             })
             .collect::<Vec<_>>()
     };
@@ -94,7 +102,7 @@ fn dataset_cost<
         accumulator = accumulator + cost;
     }
 
-    accumulator = accumulator / dataset.len() as f32;
+    accumulator = accumulator / dataset_len as f32;
 
     accumulator
 }
@@ -259,6 +267,36 @@ impl<
         self.params.clone().map(|e| e.get_real())
     }
 
+    pub fn save(&self, file_path: &str) -> std::io::Result<()> {
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(file_path)?;
+
+        for p in self.params.iter() {
+            file.write(format!("{}\n", p.get_real()).as_bytes())?;
+        }
+
+        Ok(())
+    }
+
+    pub fn load(&mut self, file_path: &str) -> std::io::Result<()> {
+        let file = OpenOptions::new().read(true).open(file_path)?;
+        let reader = io::BufReader::new(file);
+
+        for (i, line) in reader.lines().enumerate() {
+            let line = line?;
+            if let Ok(param) = line.parse::<f32>() {
+                self.params[i].set_real(param);
+            } else {
+                eprintln!("Failed to parse line: {}", line);
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn shake(&mut self, factor: f32) {
         for i in 0..P {
             self.params[i]
@@ -267,16 +305,41 @@ impl<
     }
 
     // TODO partition the dataset
+
+    pub fn train_stocastic_step<const PARALELIZE: bool, CB: Fn(usize, &Self)>(
+        &mut self,
+        dataset: &Vec<DataPoint<P, I, O>>,
+        subdataset_size: usize,
+        inter_step_callback: CB,
+    ) -> bool {
+        let mut ret = false;
+        for (i, sub_dataset) in dataset.chunks(subdataset_size).enumerate() {
+            ret |= self.train_step::<PARALELIZE, _>(sub_dataset, sub_dataset.len());
+            inter_step_callback(i, &self);
+        }
+
+        ret
+    }
+
     // TODO adam
 
     // TODO return a proper error when NaN apears
 
-    pub fn train_step<const PARALELIZE: bool>(
+    pub fn train_step<
+        'a,
+        'b,
+        const PARALELIZE: bool,
+        D: IntoIterator<Item = &'b DataPoint<P, I, O>>
+            + IntoParallelIterator<Item = &'a DataPoint<P, I, O>>
+            + Clone,
+    >(
         &mut self,
-        dataset: &Vec<DataPoint<P, I, O>>,
+        dataset: D,
+        dataset_len: usize,
     ) -> bool {
-        let cost: Dual<P, S> = dataset_cost::<PARALELIZE, _, _, _, _, _, _>(
-            dataset,
+        let cost: Dual<P, S> = dataset_cost::<PARALELIZE, _, _, _, _, _, _, _>(
+            dataset.clone(),
+            dataset_len,
             &self.params,
             &self.model_gradient,
             &self.extra_data,
@@ -301,8 +364,9 @@ impl<
                 self.params[i].set_real(*param);
             }
 
-            let new_cost: f32 = dataset_cost::<PARALELIZE, _, _, _, _, _, _>(
-                dataset,
+            let new_cost: f32 = dataset_cost::<PARALELIZE, _, _, _, _, _, _, _>(
+                dataset.clone(),
+                dataset_len,
                 &new_params,
                 &self.model,
                 &self.extra_data,
