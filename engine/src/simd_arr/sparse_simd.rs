@@ -36,6 +36,7 @@ impl<const CAPACITY: usize, const S: usize> VecSparseSimd<CAPACITY, S> {
     }
 
     pub fn zero_with_capacity(capacity: usize) -> VecSparseSimd<CAPACITY, S> {
+        // println!("creating sparse simd with {:?} as capacity", capacity);
         Self {
             data_index: Vec::with_capacity(capacity),
             data: Vec::with_capacity(capacity),
@@ -74,47 +75,54 @@ impl<const CAPACITY: usize, const S: usize> VecSparseSimd<CAPACITY, S> {
         } else {
             let mut ret = Self::zero_with_capacity(self.data.len() + rhs.data.len());
 
-            let mut rhs_cursor = 0;
+            let mut rhs_iter = rhs.data_index.iter().zip(rhs.data.iter()).peekable();
 
-            for self_cursor in 0..self.data.len() {
-                while rhs_cursor < rhs.data_index.len()
-                    && rhs.data_index[rhs_cursor] < self.data_index[self_cursor]
-                {
-                    if ret.data.len() == CAPACITY {
-                        return Err(());
+            for self_index in self.data_index.iter().zip(self.data.iter()) {
+                let (self_idx, self_val) = self_index;
+
+                while let Some(&(rhs_idx, rhs_val)) = rhs_iter.peek() {
+                    if rhs_idx < self_idx {
+                        if ret.data.len() == CAPACITY {
+                            return Err(());
+                        }
+                        ret.data_index.push(*rhs_idx);
+                        ret.data.push(*rhs_val);
+                        rhs_iter.next();
+                    } else {
+                        break;
                     }
-                    ret.data_index.push(rhs.data_index[rhs_cursor]);
-                    ret.data.push(rhs.data[rhs_cursor]);
-
-                    rhs_cursor += 1;
                 }
-                if rhs_cursor < rhs.data_index.len()
-                    && rhs.data_index[rhs_cursor] == self.data_index[self_cursor]
-                {
-                    if ret.data.len() == CAPACITY {
-                        return Err(());
-                    }
-                    ret.data_index.push(rhs.data_index[rhs_cursor]);
-                    ret.data.push(self.data[self_cursor] + rhs.data[rhs_cursor]);
 
-                    rhs_cursor += 1;
+                if let Some(&(rhs_idx, rhs_val)) = rhs_iter.peek() {
+                    if *rhs_idx == *self_idx {
+                        if ret.data.len() == CAPACITY {
+                            return Err(());
+                        }
+                        ret.data_index.push(*rhs_idx);
+                        ret.data.push(*self_val + rhs_val);
+                        rhs_iter.next();
+                    } else {
+                        if ret.data.len() == CAPACITY {
+                            return Err(());
+                        }
+                        ret.data_index.push(*self_idx);
+                        ret.data.push(*self_val);
+                    }
                 } else {
                     if ret.data.len() == CAPACITY {
                         return Err(());
                     }
-                    ret.data_index.push(self.data_index[self_cursor]);
-                    ret.data.push(self.data[self_cursor]);
+                    ret.data_index.push(*self_idx);
+                    ret.data.push(*self_val);
                 }
             }
-            while rhs_cursor < rhs.data.len() {
+
+            while let Some((rhs_idx, rhs_val)) = rhs_iter.next() {
                 if ret.data.len() == CAPACITY {
                     return Err(());
                 }
-
-                ret.data_index.push(rhs.data_index[rhs_cursor]);
-                ret.data.push(rhs.data[rhs_cursor]);
-
-                rhs_cursor += 1;
+                ret.data_index.push(*rhs_idx);
+                ret.data.push(*rhs_val);
             }
 
             self.data = ret.data;
@@ -123,6 +131,7 @@ impl<const CAPACITY: usize, const S: usize> VecSparseSimd<CAPACITY, S> {
             Ok(())
         }
     }
+
 
     pub fn multiply(&mut self, rhs: f32) {
         for i in 0..self.data.len() {
@@ -175,7 +184,7 @@ mod vec_sparse_simd_tests {
     use rand_chacha::ChaCha8Rng;
     use std::array::from_fn;
 
-    use crate::simd_arr::vec_sparse_simd::VecSparseSimd;
+    use crate::simd_arr::sparse_simd::VecSparseSimd;
 
     #[test]
     fn test_create() {

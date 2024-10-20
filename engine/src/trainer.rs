@@ -1,19 +1,15 @@
-use std::fs::{File, OpenOptions};
+use std::array;
+use std::fs::OpenOptions;
 use std::io::{self, BufRead, Write};
 use std::ops::{Add, Div, Sub};
-use std::path::Path;
-use std::{array, fs};
 
 use crate::dual::extended_arithmetic::ExtendedArithmetic;
 use crate::dual::Dual;
 use crate::simd_arr::dense_simd::DenseSimd;
-use crate::simd_arr::heap_hybrid_simd::HeapHybridSimd;
 use crate::simd_arr::hybrid_simd::HybridSimd;
 use crate::simd_arr::SimdArr;
-use indicatif::ParallelProgressIterator;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use rayon::iter::IntoParallelRefIterator;
 use rayon::prelude::*;
 use std::fmt::Debug;
 
@@ -80,7 +76,7 @@ fn dataset_cost<
     let cost_list = if PARALELIZE {
         dataset
             .into_par_iter()
-            .progress_count(dataset_len as u64)
+            // .progress_count(dataset_len as u64)
             .map(|data_point| {
                 let prediction = (model)(&params, &data_point.input, &extra);
 
@@ -195,49 +191,7 @@ impl<
     ) -> Self {
         rayon::ThreadPoolBuilder::new()
             .stack_size(1 * 1024 * 1024 * 1024)
-            .build_global()
-            .unwrap();
-
-        let mut rng = ChaCha8Rng::seed_from_u64(2);
-
-        Self {
-            model_gradient: trainable_gradient,
-            model: trainable,
-            params: array::from_fn(|i| Dual::new_param(rng.gen::<f32>() - 0.5, i)),
-            param_translator,
-            extra_data,
-            last_cost: None,
-        }
-    }
-}
-
-impl<
-        const P: usize,
-        const I: usize,
-        const O: usize,
-        const CRITIALITY: usize,
-        ExtraData: Sync + Clone,
-        FG: Fn(
-                &[Dual<P, HeapHybridSimd<P, CRITIALITY>>; P],
-                &[f32; I],
-                &ExtraData,
-            ) -> [Dual<P, HeapHybridSimd<P, CRITIALITY>>; O]
-            + Sync,
-        F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync,
-        ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
-    > Trainer<P, I, O, ExtraData, HeapHybridSimd<P, CRITIALITY>, FG, F, ParamTranslate>
-{
-    pub fn new_heap_hybrid(
-        _: CriticalityCue<CRITIALITY>,
-        trainable: F,
-        trainable_gradient: FG,
-        param_translator: ParamTranslate,
-        extra_data: ExtraData,
-    ) -> Self {
-        rayon::ThreadPoolBuilder::new()
-            .stack_size(1 * 1024 * 1024 * 1024)
-            .build_global()
-            .unwrap();
+            .build_global();
 
         let mut rng = ChaCha8Rng::seed_from_u64(2);
 

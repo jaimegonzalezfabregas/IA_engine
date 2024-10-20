@@ -4,22 +4,20 @@ extern crate image as im;
 extern crate piston_window;
 extern crate vecmath;
 
+mod eval_thread;
 mod matrix;
 mod mnist;
 mod neuronal_network;
 
-use std::{env, thread};
+use std::{env, thread, time::Instant};
 
-use ia_engine::trainer::{
-    default_param_translator, param_translator_with_bounds, CriticalityCue, DataPoint, Trainer,
-};
-use im::imageops::FilterType::Nearest;
-use math::Matrix2d;
+use crate::eval_thread::eval_thread;
+use ia_engine::trainer::{default_param_translator, CriticalityCue, Trainer};
+
 use mnist::load_data;
 use neuronal_network::neuronal_network;
-use rand::seq::SliceRandom;
-
 use piston_window::*;
+use rand::seq::SliceRandom;
 use vecmath::*;
 
 fn main() {
@@ -39,6 +37,14 @@ fn main() {
 }
 
 fn main_demo() {
+    let mut last_change_time = None;
+    let mut rng = rand::thread_rng();
+
+    let mut dataset: Vec<ia_engine::trainer::DataPoint<0, _, 10>> =
+        load_data("mnist/t10k").unwrap();
+
+    let mut pixel_input = [0.; { 28 * 28 }];
+
     let opengl = OpenGL::V3_2;
     let (width, height) = (280, 280);
     let mut window: PistonWindow = WindowSettings::new("piston: paint", (width, height))
@@ -62,7 +68,11 @@ fn main_demo() {
 
     let mut last_pos: Option<[f64; 2]> = None;
 
+    let mut frame_n = 0;
+    let mut change = false;
+
     while let Some(e) = window.next() {
+        frame_n += 1;
         if e.render_args().is_some() {
             texture.update(&mut texture_context, &canvas).unwrap();
             window.draw_2d(&e, |c, g, device| {
@@ -73,9 +83,23 @@ fn main_demo() {
                 image(&texture, c.transform.scale(10., 10.), g);
             });
         }
+
         if let Some(button) = e.press_args() {
             if button == Button::Mouse(MouseButton::Left) {
                 draw = true;
+            }
+
+            if button == Button::Keyboard(Key::C) {
+                pixel_input = [0.; 28 * 28];
+                change = true;
+            }
+
+            if button == Button::Keyboard(Key::S) {
+                dataset.shuffle(&mut rng);
+
+                pixel_input = dataset[0].input;
+
+                change = true;
             }
         };
         if let Some(button) = e.release_args() {
@@ -99,13 +123,53 @@ fn main_demo() {
                         let new_x = (last_x + (diff_x * delta)) as u32;
                         let new_y = (last_y + (diff_y * delta)) as u32;
                         if new_x < width && new_y < height {
-                            canvas.put_pixel(new_x / 10, new_y / 10, im::Rgba([0, 0, 0, 255]));
+                            pixel_input[(new_x / 10 + new_y / 10 * 28) as usize] = 1.;
+                            change = true;
                         };
                     }
                 };
 
                 last_pos = Some(pos)
             };
+        }
+
+        if change {
+            change = false;
+            last_change_time = Some(Instant::now());
+
+            for x in 0..28 {
+                for y in 0..28 {
+                    let c = 1. - pixel_input[(x + y * 28) as usize];
+                    canvas.put_pixel(
+                        x,
+                        y,
+                        im::Rgba([(c * 255.) as u8, (c * 255.) as u8, (c * 255.) as u8, 255]),
+                    );
+                }
+            }
+        }
+
+        if let Some(t) = last_change_time {
+            if t.elapsed().as_secs_f64() > 0.5 {
+                last_change_time = None;
+                let predition = thread::Builder::new()
+                    .stack_size(20_000_000_000)
+                    .name("big stack main".into())
+                    .spawn(move || eval_thread(&pixel_input))
+                    .unwrap()
+                    .join()
+                    .unwrap();
+
+                let mut max_pos = 0;
+
+                for (i, pred) in predition.iter().enumerate() {
+                    if predition[max_pos] < *pred {
+                        max_pos = i;
+                    }
+                }
+
+                println!("predition: {max_pos}, {:?} ", predition)
+            }
         }
     }
 }
@@ -115,22 +179,21 @@ fn train_main() {
 
     let mut dataset = load_data("mnist/t10k").unwrap();
 
-    dataset.shuffle(&mut rng);
-
-    let mut trainer = Trainer::new_heap_hybrid(
-        CriticalityCue::<{ 63610 / 4 }>(),
-        neuronal_network::<{ 28 * 28 }, 10, 63610, _>,
+    let mut trainer = Trainer::new_hybrid(
+        CriticalityCue::<269322>(),
+        neuronal_network::<{ 28 * 28 }, 10, 269322, _>,
         neuronal_network::<{ 28 * 28 }, _, _, _>,
         default_param_translator,
         // param_translator_with_bounds::<_, 4, -4>,
-        vec![28 * 28, 80, 10],
+        vec![28 * 28, 256, 256, 10],
     );
 
-    trainer.load("model.bin");
+    trainer.load("model.bin").unwrap();
 
-    while trainer.train_stocastic_step::<true, _>(&dataset, 16 * 16, |i, trainer| {
-        println!("{} / {}", i * 16 * 16, dataset.len());
+    while trainer.train_stocastic_step::<true, _>(&dataset, 64, |i, trainer| {
+        println!("{} / {}", i * 64, dataset.len());
         trainer.save("model.bin").unwrap();
+        println!("{:?}", trainer.get_last_cost());
     }) {
         // println!("{:?}", trainer.get_model_params());
         println!("{:?}", trainer.get_last_cost());

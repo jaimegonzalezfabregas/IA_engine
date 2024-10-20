@@ -81,9 +81,7 @@ impl<const P: usize, S: SimdArr<P>> ExtendedArithmetic for Dual<P, S> {
     fn sigmoid_on_mut(&mut self) {
         self.real = self.real.sigmoid();
 
-        for i in 0..P {
-            self.sigma[i] *= self.real * (1. - self.real);
-        }
+        self.sigma.multiply(self.real * (1. - self.real));
     }
 
     fn relu_on_mut(&mut self) {

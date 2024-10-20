@@ -1,23 +1,23 @@
 use std::ops::{Index, IndexMut};
 
-use super::{dense_simd::DenseSimd, arr_sparse_simd::ArrSparseSimd, SimdArr};
+use super::{dense_simd::DenseSimd, sparse_simd::VecSparseSimd, SimdArr};
 
 #[derive(Clone, Debug)]
 pub enum HybridSimd<const SIZE: usize, const CRITIALITY: usize> {
-    Dense(DenseSimd<SIZE>),
-    Sparse(ArrSparseSimd<CRITIALITY, SIZE>),
+    Dense(Box<DenseSimd<SIZE>>),
+    Sparse(VecSparseSimd<CRITIALITY, SIZE>),
 }
 
 impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
     fn new_from_array(arr: [f32; S]) -> Self {
-        match ArrSparseSimd::new_from_array(&arr) {
-            None => HybridSimd::Dense(DenseSimd::new_from_array(arr)),
+        match VecSparseSimd::new_from_array(&arr) {
+            None => HybridSimd::Dense(Box::new(DenseSimd::new_from_array(arr))),
             Some(sparse) => HybridSimd::Sparse(sparse),
         }
     }
 
     fn zero() -> Self {
-        Self::Sparse(ArrSparseSimd::zero())
+        Self::Sparse(VecSparseSimd::zero())
     }
 
     fn to_array(&self) -> [f32; S] {
@@ -39,7 +39,7 @@ impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
     }
 
     fn new_from_value_and_pos(val: f32, pos: usize) -> Self {
-        HybridSimd::Sparse(ArrSparseSimd::new_from_value_and_pos(val, pos))
+        HybridSimd::Sparse(VecSparseSimd::new_from_value_and_pos(val, pos))
     }
 
     fn acumulate(&mut self, rhs: &Self) {
@@ -53,7 +53,7 @@ impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
                 let mut transformation = DenseSimd::new_from_array(res.to_array());
                 transformation.acumulate(b);
 
-                *res = HybridSimd::Dense(transformation);
+                *res = HybridSimd::Dense(Box::new(transformation));
             }
             (res @ HybridSimd::Sparse(_), HybridSimd::Sparse(b)) => {
                 let success = res.unwrap_sparse().acumulate(b);
@@ -61,7 +61,7 @@ impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
                     let mut transformation_self = DenseSimd::new_from_array(res.to_array());
                     let transformation_rhs = DenseSimd::new_from_array(b.to_array());
                     transformation_self.acumulate(&transformation_rhs);
-                    *res = HybridSimd::Dense(transformation_self)
+                    *res = HybridSimd::Dense(Box::new(transformation_self))
                 }
             }
         }
@@ -76,7 +76,7 @@ impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
 }
 
 impl<const S: usize, const C: usize> HybridSimd<S, C> {
-    fn unwrap_sparse<'a>(&'a mut self) -> &'a mut ArrSparseSimd<C, S> {
+    fn unwrap_sparse<'a>(&'a mut self) -> &'a mut VecSparseSimd<C, S> {
         if let Self::Sparse(x) = self {
             x
         } else {
@@ -105,15 +105,15 @@ impl<const S: usize, const C: usize> IndexMut<usize> for HybridSimd<S, C> {
     }
 }
 
-
-
 #[cfg(test)]
 mod hybrid_simd_tests {
     use rand::{self, seq::SliceRandom, Rng, SeedableRng};
     use rand_chacha::ChaCha8Rng;
     use std::array::from_fn;
 
-    use crate::simd_arr::{hybrid_simd::HybridSimd, SimdArr};
+    use crate::simd_arr::SimdArr;
+
+    use super::HybridSimd;
 
     fn test_add<const N: usize>(a: [f32; N], b: [f32; N]) {
         let res_vec = a
@@ -170,10 +170,7 @@ mod hybrid_simd_tests {
             let cero_ratio: f32 = rng.gen();
             let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
 
-            assert_eq!(
-                a,
-                HybridSimd::<32, 32>::new_from_array(a).to_array()
-            )
+            assert_eq!(a, HybridSimd::<32, 32>::new_from_array(a).to_array())
         }
     }
 

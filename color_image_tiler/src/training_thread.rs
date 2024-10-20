@@ -23,7 +23,7 @@ pub(crate) fn train_work(
     tx: Option<Sender<TrainerComunicationCodes<([f32; TILE_COUNT * 5], (Option<f32>, usize))>>>,
     max_iterations: Option<usize>,
 ) {
-    let mut trainer = Trainer::new_heap_hybrid(
+    let mut trainer = Trainer::new_hybrid(
         CriticalityCue::<{ TILE_COUNT / 2 }>(),
         tiler,
         tiler,

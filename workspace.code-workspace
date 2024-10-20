@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "color_image_tiler"
+		},
+		{
+			"path": "polinomials"
 		}
 	],
 	"settings": {

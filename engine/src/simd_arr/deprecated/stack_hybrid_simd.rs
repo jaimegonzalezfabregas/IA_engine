@@ -1,67 +1,67 @@
 use std::ops::{Index, IndexMut};
 
-use super::{dense_simd::DenseSimd, vec_sparse_simd::VecSparseSimd, SimdArr};
+use super::{dense_simd::DenseSimd, arr_sparse_simd::ArrSparseSimd, SimdArr};
 
 #[derive(Clone, Debug)]
-pub enum HeapHybridSimd<const SIZE: usize, const CRITIALITY: usize> {
-    Dense(Box<DenseSimd<SIZE>>),
-    Sparse(VecSparseSimd<CRITIALITY, SIZE>),
+pub enum HybridSimd<const SIZE: usize, const CRITIALITY: usize> {
+    Dense(DenseSimd<SIZE>),
+    Sparse(ArrSparseSimd<CRITIALITY, SIZE>),
 }
 
-impl<const S: usize, const C: usize> SimdArr<S> for HeapHybridSimd<S, C> {
+impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
     fn new_from_array(arr: [f32; S]) -> Self {
-        match VecSparseSimd::new_from_array(&arr) {
-            None => HeapHybridSimd::Dense(Box::new(DenseSimd::new_from_array(arr))),
-            Some(sparse) => HeapHybridSimd::Sparse(sparse),
+        match ArrSparseSimd::new_from_array(&arr) {
+            None => HybridSimd::Dense(DenseSimd::new_from_array(arr)),
+            Some(sparse) => HybridSimd::Sparse(sparse),
         }
     }
 
     fn zero() -> Self {
-        Self::Sparse(VecSparseSimd::zero())
+        Self::Sparse(ArrSparseSimd::zero())
     }
 
     fn to_array(&self) -> [f32; S] {
         match self {
-            HeapHybridSimd::Dense(d) => d.to_array(),
-            HeapHybridSimd::Sparse(s) => s.to_array(),
+            HybridSimd::Dense(d) => d.to_array(),
+            HybridSimd::Sparse(s) => s.to_array(),
         }
     }
 
     fn neg(&mut self) {
         match self {
-            HeapHybridSimd::Dense(d) => {
+            HybridSimd::Dense(d) => {
                 d.neg();
             }
-            HeapHybridSimd::Sparse(s) => {
+            HybridSimd::Sparse(s) => {
                 s.neg();
             }
         }
     }
 
     fn new_from_value_and_pos(val: f32, pos: usize) -> Self {
-        HeapHybridSimd::Sparse(VecSparseSimd::new_from_value_and_pos(val, pos))
+        HybridSimd::Sparse(ArrSparseSimd::new_from_value_and_pos(val, pos))
     }
 
     fn acumulate(&mut self, rhs: &Self) {
         match (self, rhs) {
-            (HeapHybridSimd::Dense(a), HeapHybridSimd::Dense(b)) => a.acumulate(b),
-            (HeapHybridSimd::Dense(a), HeapHybridSimd::Sparse(b)) => {
+            (HybridSimd::Dense(a), HybridSimd::Dense(b)) => a.acumulate(b),
+            (HybridSimd::Dense(a), HybridSimd::Sparse(b)) => {
                 let transformation = DenseSimd::new_from_array(b.to_array());
                 a.acumulate(&transformation);
             }
-            (res @ HeapHybridSimd::Sparse(_), HeapHybridSimd::Dense(b)) => {
+            (res @ HybridSimd::Sparse(_), HybridSimd::Dense(b)) => {
                 let mut transformation = DenseSimd::new_from_array(res.to_array());
                 transformation.acumulate(b);
 
-                *res = HeapHybridSimd::Dense(Box::new(transformation));
+                *res = HybridSimd::Dense(transformation);
             }
-            (res @ HeapHybridSimd::Sparse(_), HeapHybridSimd::Sparse(b)) => {
+            (res @ HybridSimd::Sparse(_), HybridSimd::Sparse(b)) => {
                 let success = res.unwrap_sparse().acumulate(b);
                 if success.is_err() {
                     let mut transformation_self = DenseSimd::new_from_array(res.to_array());
                     let transformation_rhs = DenseSimd::new_from_array(b.to_array());
                     transformation_self.acumulate(&transformation_rhs);
-                    *res = HeapHybridSimd::Dense(Box::new(transformation_self))
+                    *res = HybridSimd::Dense(transformation_self)
                 }
             }
         }
@@ -69,14 +69,14 @@ impl<const S: usize, const C: usize> SimdArr<S> for HeapHybridSimd<S, C> {
 
     fn multiply(&mut self, rhs: f32) {
         match self {
-            HeapHybridSimd::Dense(d) => d.multiply(rhs),
-            HeapHybridSimd::Sparse(s) => s.multiply(rhs),
+            HybridSimd::Dense(d) => d.multiply(rhs),
+            HybridSimd::Sparse(s) => s.multiply(rhs),
         }
     }
 }
 
-impl<const S: usize, const C: usize> HeapHybridSimd<S, C> {
-    fn unwrap_sparse<'a>(&'a mut self) -> &'a mut VecSparseSimd<C, S> {
+impl<const S: usize, const C: usize> HybridSimd<S, C> {
+    fn unwrap_sparse<'a>(&'a mut self) -> &'a mut ArrSparseSimd<C, S> {
         if let Self::Sparse(x) = self {
             x
         } else {
@@ -85,25 +85,27 @@ impl<const S: usize, const C: usize> HeapHybridSimd<S, C> {
     }
 }
 
-impl<const S: usize, const C: usize> Index<usize> for HeapHybridSimd<S, C> {
+impl<const S: usize, const C: usize> Index<usize> for HybridSimd<S, C> {
     type Output = f32;
 
     fn index(&self, index: usize) -> &Self::Output {
         match self {
-            HeapHybridSimd::Dense(d) => &d[index],
-            HeapHybridSimd::Sparse(s) => &s[index],
+            HybridSimd::Dense(d) => &d[index],
+            HybridSimd::Sparse(s) => &s[index],
         }
     }
 }
 
-impl<const S: usize, const C: usize> IndexMut<usize> for HeapHybridSimd<S, C> {
+impl<const S: usize, const C: usize> IndexMut<usize> for HybridSimd<S, C> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         match self {
-            HeapHybridSimd::Dense(d) => &mut d[index],
-            HeapHybridSimd::Sparse(s) => &mut s[index],
+            HybridSimd::Dense(d) => &mut d[index],
+            HybridSimd::Sparse(s) => &mut s[index],
         }
     }
 }
+
+
 
 #[cfg(test)]
 mod hybrid_simd_tests {
@@ -111,9 +113,7 @@ mod hybrid_simd_tests {
     use rand_chacha::ChaCha8Rng;
     use std::array::from_fn;
 
-    use crate::simd_arr::SimdArr;
-
-    use super::HeapHybridSimd;
+    use crate::simd_arr::{hybrid_simd::HybridSimd, SimdArr};
 
     fn test_add<const N: usize>(a: [f32; N], b: [f32; N]) {
         let res_vec = a
@@ -123,8 +123,8 @@ mod hybrid_simd_tests {
             .collect::<Vec<_>>();
         let res: [f32; N] = from_fn(|i| res_vec[i]);
 
-        let mut x = HeapHybridSimd::<N, N>::new_from_array(a);
-        let y = HeapHybridSimd::<N, N>::new_from_array(b);
+        let mut x = HybridSimd::<N, N>::new_from_array(a);
+        let y = HybridSimd::<N, N>::new_from_array(b);
 
         x.acumulate(&y);
 
@@ -139,8 +139,8 @@ mod hybrid_simd_tests {
             .collect::<Vec<_>>();
         let res: [f32; N] = from_fn(|i| res_vec[i]);
 
-        let mut x = HeapHybridSimd::<N, N>::new_from_array(a);
-        let mut y = HeapHybridSimd::<N, N>::new_from_array(b);
+        let mut x = HybridSimd::<N, N>::new_from_array(a);
+        let mut y = HybridSimd::<N, N>::new_from_array(b);
         y.neg();
 
         x.acumulate(&y);
@@ -170,14 +170,17 @@ mod hybrid_simd_tests {
             let cero_ratio: f32 = rng.gen();
             let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
 
-            assert_eq!(a, HeapHybridSimd::<32, 32>::new_from_array(a).to_array())
+            assert_eq!(
+                a,
+                HybridSimd::<32, 32>::new_from_array(a).to_array()
+            )
         }
     }
 
     fn test_mul_scalar<const N: usize>(a: [f32; N], b: f32) {
         let res = a.map(|a_elm| a_elm * b);
 
-        let mut test = HeapHybridSimd::<N, N>::new_from_array(a);
+        let mut test = HybridSimd::<N, N>::new_from_array(a);
         test.multiply(b);
 
         assert_eq!(test.to_array(), res)
@@ -186,7 +189,7 @@ mod hybrid_simd_tests {
     fn test_div_scalar<const N: usize>(a: [f32; N], b: f32) {
         let res = a.map(|a_elm| a_elm * (1. / b)); // good enough
 
-        let mut test = HeapHybridSimd::<N, N>::new_from_array(a);
+        let mut test = HybridSimd::<N, N>::new_from_array(a);
         test.multiply(1. / b);
 
         assert_eq!(test.to_array(), res)
@@ -210,7 +213,7 @@ mod hybrid_simd_tests {
         for i in 0..10 {
             let mut test_arr = [0.; 10];
             test_arr[i] = 1.;
-            let x = HeapHybridSimd::<10, 10>::new_from_array(test_arr);
+            let x = HybridSimd::<10, 10>::new_from_array(test_arr);
 
             for j in 0..10 {
                 if i == j {
@@ -231,7 +234,7 @@ mod hybrid_simd_tests {
             let cero_ratio: f32 = rng.gen();
             let a: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
 
-            let mut x: HeapHybridSimd<4, 4> = HeapHybridSimd::zero();
+            let mut x: HybridSimd<4, 4> = HybridSimd::zero();
             let mut order = (0..4).collect::<Vec<_>>();
             order.shuffle(&mut rng);
             for i in order {
@@ -253,7 +256,7 @@ mod hybrid_simd_tests {
             let a: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
             let b: [f32; 4] = rand::random::<[f32; 4]>().map(|x| (x - cero_ratio).max(0.));
 
-            let mut y = HeapHybridSimd::<4, 4>::new_from_array(b);
+            let mut y = HybridSimd::<4, 4>::new_from_array(b);
             let mut order = (0..4).collect::<Vec<_>>();
             order.shuffle(&mut rng);
             for i in order {
@@ -275,8 +278,8 @@ mod hybrid_simd_tests {
             let a: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
             let b: [f32; 32] = rand::random::<[f32; 32]>().map(|x| (x - cero_ratio).max(0.));
 
-            let mut x: HeapHybridSimd<32, 32> = HeapHybridSimd::zero();
-            let mut y: HeapHybridSimd<32, 32> = HeapHybridSimd::new_from_array(b);
+            let mut x: HybridSimd<32, 32> = HybridSimd::zero();
+            let mut y: HybridSimd<32, 32> = HybridSimd::new_from_array(b);
             let mut order = (0..32).collect::<Vec<_>>();
             order.shuffle(&mut rng);
             for i in order {
@@ -294,7 +297,7 @@ mod hybrid_simd_tests {
     #[test]
     fn test_indexing_mut() {
         for i in 0..10 {
-            let mut x = HeapHybridSimd::<10, 10>::new_from_array([0.; 10]);
+            let mut x = HybridSimd::<10, 10>::new_from_array([0.; 10]);
             x[i] = 1.;
 
             for j in 0..10 {
@@ -310,7 +313,7 @@ mod hybrid_simd_tests {
     #[test]
     fn test_optimistic_allocation() {
         let test = [1., 0., 0., 2., 0., 0., 1., 3., 0., 9.];
-        let x = HeapHybridSimd::<10, 10>::new_from_array(test);
+        let x = HybridSimd::<10, 10>::new_from_array(test);
 
         assert_eq!(x.to_array(), test);
     }
