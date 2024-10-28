@@ -1,6 +1,6 @@
 use std::array;
 use std::fmt::Debug;
-use std::ops::{Add, Mul};
+use std::ops::{Add, Div, Mul};
 
 use ia_engine::dual::extended_arithmetic::ExtendedArithmetic;
 
@@ -26,6 +26,7 @@ pub fn neuronal_network<
         + Add<N, Output = N>
         + Mul<N, Output = N>
         + Mul<f32, Output = N>
+        + Div<N, Output = N>
         + ExtendedArithmetic,
 >(
     params: &[N; P],
@@ -57,11 +58,26 @@ pub fn neuronal_network<
             &params[parameter_cursor..(parameter_cursor + layer_size)],
         );
 
+        // print!(
+        //     "{:#?}, {parameter_cursor}, {layer_size}",
+        //     &params[parameter_cursor..(parameter_cursor + layer_size)]
+        // );
+
         propagation = layer_weights * propagation.add_bias();
+
         propagation.delinearize(sigmoid);
     }
 
     let vec_out = propagation.serialize();
 
-    array::from_fn(|i| vec_out[i].clone())
+    let exp_out = vec_out.into_iter().map(|x| x.exp()).collect::<Vec<_>>();
+
+    let mut acc = N::from(0.);
+    for n in exp_out.iter() {
+        acc.accumulate(n);
+    }
+
+    let ret = array::from_fn(|i| exp_out[i].clone() / acc.clone());
+
+    ret
 }

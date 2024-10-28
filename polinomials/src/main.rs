@@ -34,7 +34,7 @@ fn main() {
     while let Some(_) = draw_piston_window(&mut window, |b|  {
         for _ in 0..1000 {
             let dataset = dataset_service(epoch);
-            let done = trainer.train_step::<true,_>(&dataset, dataset.len() );
+            let done = trainer.train_step_asintotic_search::<true,_,_>(&dataset, &dataset, dataset.len(), dataset.len() );
             if !done {
                 epoch += 1;
                 break;

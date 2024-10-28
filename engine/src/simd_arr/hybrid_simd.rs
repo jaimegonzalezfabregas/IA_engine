@@ -16,6 +16,13 @@ impl<const S: usize, const C: usize> SimdArr<S> for HybridSimd<S, C> {
         }
     }
 
+    fn check_nan(&self) {
+        match self {
+            HybridSimd::Dense(d) => d.check_nan(),
+            HybridSimd::Sparse(s) => s.check_nan(),
+        }
+    }
+
     fn zero() -> Self {
         Self::Sparse(VecSparseSimd::zero())
     }

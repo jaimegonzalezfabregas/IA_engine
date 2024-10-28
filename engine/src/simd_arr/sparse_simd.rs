@@ -28,6 +28,10 @@ impl<const CAPACITY: usize, const S: usize> VecSparseSimd<CAPACITY, S> {
         Some(ret)
     }
 
+    pub fn check_nan(&self) {
+        // self.data.iter().for_each(|x| assert!(x.is_finite()));
+    }
+
     pub fn zero() -> VecSparseSimd<CAPACITY, S> {
         Self {
             data_index: Vec::new(),
@@ -131,7 +135,6 @@ impl<const CAPACITY: usize, const S: usize> VecSparseSimd<CAPACITY, S> {
             Ok(())
         }
     }
-
 
     pub fn multiply(&mut self, rhs: f32) {
         for i in 0..self.data.len() {

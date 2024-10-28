@@ -41,6 +41,10 @@ impl<const S: usize> SimdArr<S> for DenseSimd<S> {
     fn new_from_array(data: [f32; S]) -> DenseSimd<S> {
         Self(data)
     }
+
+    fn check_nan(&self) {
+        // self.0.iter().for_each(|x| assert!(x.is_finite()));
+    }
 }
 impl<const S: usize> Index<usize> for DenseSimd<S> {
     type Output = f32;

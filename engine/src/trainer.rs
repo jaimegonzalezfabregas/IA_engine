@@ -2,12 +2,14 @@ use std::array;
 use std::fs::OpenOptions;
 use std::io::{self, BufRead, Write};
 use std::ops::{Add, Div, Sub};
+use std::time::Instant;
 
 use crate::dual::extended_arithmetic::ExtendedArithmetic;
 use crate::dual::Dual;
 use crate::simd_arr::dense_simd::DenseSimd;
 use crate::simd_arr::hybrid_simd::HybridSimd;
 use crate::simd_arr::SimdArr;
+use indicatif::ParallelProgressIterator;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
@@ -47,6 +49,8 @@ fn datapoint_cost<
 fn dataset_cost<
     'a,
     'b,
+    const PROGRESS: bool,
+    const DEBUG: bool,
     const PARALELIZE: bool,
     const P: usize,
     const I: usize,
@@ -74,21 +78,40 @@ fn dataset_cost<
 ) -> N {
     let mut accumulator = N::from(0.);
     let cost_list = if PARALELIZE {
-        dataset
-            .into_par_iter()
-            // .progress_count(dataset_len as u64)
-            .map(|data_point| {
-                let prediction = (model)(&params, &data_point.input, &extra);
+        if PROGRESS {
+            dataset
+                .into_par_iter()
+                .progress_count(dataset_len as u64)
+                .map(|data_point| {
+                    let prediction = (model)(&params, &data_point.input, &extra);
 
-                datapoint_cost(&data_point, prediction)
-            })
-            .collect::<Vec<_>>()
+                    if DEBUG {
+                        println!("goal {:?} predition {:?}", data_point.output, prediction);
+                    }
+
+                    datapoint_cost(&data_point, prediction)
+                })
+                .collect::<Vec<_>>()
+        } else {
+            dataset
+                .into_par_iter()
+                .map(|data_point| {
+                    let prediction = (model)(&params, &data_point.input, &extra);
+                    if DEBUG {
+                        println!("goal {:?} predition {:?}", data_point.output, prediction);
+                    }
+                    datapoint_cost(&data_point, prediction)
+                })
+                .collect::<Vec<_>>()
+        }
     } else {
         dataset
             .into_iter()
             .map(|data_point| {
                 let prediction = (model)(&params, &data_point.input, &extra);
-
+                if DEBUG {
+                    println!("goal {:?} predition {:?}", data_point.output, prediction);
+                }
                 datapoint_cost(&data_point, prediction)
             })
             .collect::<Vec<_>>()
@@ -114,15 +137,17 @@ pub fn param_translator_with_bounds<const P: usize, const MAX: isize, const MIN:
     array::from_fn(|i| (params[i] + vector[i]).min(MAX as f32).max(MIN as f32))
 }
 
+#[derive(Clone)]
+
 pub struct Trainer<
     const P: usize,
     const I: usize,
     const O: usize,
     ExtraData: Sync + Clone,
     S: SimdArr<P>,
-    FG: Fn(&[Dual<P, S>; P], &[f32; I], &ExtraData) -> [Dual<P, S>; O] + Sync,
-    F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync,
-    ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
+    FG: Fn(&[Dual<P, S>; P], &[f32; I], &ExtraData) -> [Dual<P, S>; O] + Sync + Clone,
+    F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync + Clone,
+    ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P] + Clone,
 > {
     model_gradient: FG,
     model: F,
@@ -137,9 +162,11 @@ impl<
         const I: usize,
         const O: usize,
         ExtraData: Sync + Clone,
-        FG: Fn(&[Dual<P, DenseSimd<P>>; P], &[f32; I], &ExtraData) -> [Dual<P, DenseSimd<P>>; O] + Sync,
-        F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync,
-        ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
+        FG: Fn(&[Dual<P, DenseSimd<P>>; P], &[f32; I], &ExtraData) -> [Dual<P, DenseSimd<P>>; O]
+            + Sync
+            + Clone,
+        F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync + Clone,
+        ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P] + Clone,
     > Trainer<P, I, O, ExtraData, DenseSimd<P>, FG, F, ParamTranslate>
 {
     pub fn new_dense(
@@ -177,9 +204,10 @@ impl<
                 &[f32; I],
                 &ExtraData,
             ) -> [Dual<P, HybridSimd<P, CRITIALITY>>; O]
-            + Sync,
-        F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync,
-        ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
+            + Sync
+            + Clone,
+        F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync + Clone,
+        ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P] + Clone,
     > Trainer<P, I, O, ExtraData, HybridSimd<P, CRITIALITY>, FG, F, ParamTranslate>
 {
     pub fn new_hybrid(
@@ -212,9 +240,9 @@ impl<
         const O: usize,
         ExtraData: Sync + Clone,
         S: SimdArr<P>,
-        FG: Fn(&[Dual<P, S>; P], &[f32; I], &ExtraData) -> [Dual<P, S>; O] + Sync,
-        F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync,
-        ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P],
+        FG: Fn(&[Dual<P, S>; P], &[f32; I], &ExtraData) -> [Dual<P, S>; O] + Sync + Clone,
+        F: Fn(&[f32; P], &[f32; I], &ExtraData) -> [f32; O] + Sync + Clone,
+        ParamTranslate: Fn(&[f32; P], &[f32; P]) -> [f32; P] + Sync + Clone,
     > Trainer<P, I, O, ExtraData, S, FG, F, ParamTranslate>
 {
     pub fn get_model_params(&self) -> [f32; P] {
@@ -236,15 +264,23 @@ impl<
     }
 
     pub fn load(&mut self, file_path: &str) -> std::io::Result<()> {
-        let file = OpenOptions::new().read(true).open(file_path)?;
+        let file = OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create(true)
+            .open(file_path)?;
         let reader = io::BufReader::new(file);
 
         for (i, line) in reader.lines().enumerate() {
             let line = line?;
-            if let Ok(param) = line.parse::<f32>() {
-                self.params[i].set_real(param);
+            if i < self.params.len() {
+                if let Ok(param) = line.parse::<f32>() {
+                    self.params[i].set_real(param);
+                } else {
+                    eprintln!("Failed to parse line: {}", line);
+                }
             } else {
-                eprintln!("Failed to parse line: {}", line);
+                break;
             }
         }
 
@@ -260,7 +296,7 @@ impl<
 
     // TODO partition the dataset
 
-    pub fn train_stocastic_step<const PARALELIZE: bool, CB: Fn(usize, &Self)>(
+    pub fn train_stocastic_step<const PARALELIZE: bool, CB: Fn(usize, &mut Self)>(
         &mut self,
         dataset: &Vec<DataPoint<P, I, O>>,
         subdataset_size: usize,
@@ -268,8 +304,14 @@ impl<
     ) -> bool {
         let mut ret = false;
         for (i, sub_dataset) in dataset.chunks(subdataset_size).enumerate() {
-            ret |= self.train_step::<PARALELIZE, _>(sub_dataset, sub_dataset.len());
-            inter_step_callback(i, &self);
+            self.last_cost = None;
+            ret |= self.train_step_asintotic_search::<PARALELIZE, _, _>(
+                sub_dataset,
+                dataset,
+                sub_dataset.len(),
+                dataset.len(),
+            );
+            inter_step_callback(i, self);
         }
 
         ret
@@ -279,35 +321,51 @@ impl<
 
     // TODO return a proper error when NaN apears
 
-    pub fn train_step<
+    pub fn train_step_asintotic_search<
         'a,
         'b,
         const PARALELIZE: bool,
         D: IntoIterator<Item = &'b DataPoint<P, I, O>>
             + IntoParallelIterator<Item = &'a DataPoint<P, I, O>>
             + Clone,
+        E: IntoIterator<Item = &'b DataPoint<P, I, O>>
+            + IntoParallelIterator<Item = &'a DataPoint<P, I, O>>
+            + Clone,
     >(
         &mut self,
-        dataset: D,
-        dataset_len: usize,
+        dir_dataset: D,
+        full_dataset: E,
+        dir_dataset_len: usize,
+        full_dataset_len: usize,
     ) -> bool {
-        let cost: Dual<P, S> = dataset_cost::<PARALELIZE, _, _, _, _, _, _, _>(
-            dataset.clone(),
-            dataset_len,
+        let t0 = Instant::now();
+
+        let cost: Dual<P, S> = dataset_cost::<true, false, PARALELIZE, _, _, _, _, _, _, _>(
+            dir_dataset,
+            dir_dataset_len,
             &self.params,
             &self.model_gradient,
+            &self.extra_data,
+        );
+
+        let fast_full_cost: f32 = dataset_cost::<false, false, PARALELIZE, _, _, _, _, _, _, _>(
+            full_dataset.clone(),
+            full_dataset_len,
+            &self.params.clone().map(|x| x.get_real()),
+            &self.model,
             &self.extra_data,
         );
 
         let mut factor = 1.;
 
         let raw_gradient = cost.get_gradient();
-        let gradient_size = raw_gradient.iter().fold(0., |acc, elm| acc + (elm * elm));
+        let gradient_size: f32 = raw_gradient
+            .iter()
+            .fold(0., |acc, elm| acc + (elm * elm))
+            .max(1e-30);
 
         let unit_gradient = array::from_fn(|i| raw_gradient[i] / gradient_size.sqrt());
         let og_parameters = array::from_fn(|i| self.params[i].get_real());
-
-        // println!("  raw gradient is : {raw_gradient:?}");
 
         while {
             let gradient = unit_gradient.map(|e| -e * factor);
@@ -318,25 +376,132 @@ impl<
                 self.params[i].set_real(*param);
             }
 
-            let new_cost: f32 = dataset_cost::<PARALELIZE, _, _, _, _, _, _, _>(
-                dataset.clone(),
-                dataset_len,
+            let new_cost: f32 = dataset_cost::<false, false, PARALELIZE, _, _, _, _, _, _, _>(
+                full_dataset.clone(),
+                full_dataset_len,
                 &new_params,
                 &self.model,
                 &self.extra_data,
             );
             self.last_cost = Some(new_cost);
 
-            new_cost > cost.get_real()
+            new_cost >= fast_full_cost
         } {
-            factor /= 2.;
+            factor *= 0.7;
 
-            if factor < 0.001 {
+            if factor < 1e-10 {
                 return false;
             }
         }
+
+        println!(
+            "gradient length: {gradient_size:?} - fast_full_cost: {} - new cost: {} - learning factor: {} - improvement {} - time {}",
+            fast_full_cost, self.last_cost.unwrap(), factor, fast_full_cost - self.last_cost.unwrap(), t0.elapsed().as_secs_f32()
+        );
+
         return true;
     }
+
+    // pub fn train_step_paralel_search<
+    //     'a,
+    //     'b,
+    //     const PARALELIZE: bool,
+    //     D: IntoIterator<Item = &'b DataPoint<P, I, O>>
+    //         + IntoParallelIterator<Item = &'a DataPoint<P, I, O>>
+    //         + Clone
+    //         + Sync,
+    //     E: IntoIterator<Item = &'b DataPoint<P, I, O>>
+    //         + IntoParallelIterator<Item = &'a DataPoint<P, I, O>>
+    //         + Clone
+    //         + Sync,
+    // >(
+    //     &mut self,
+    //     dir_dataset: D,
+    //     full_dataset: E,
+    //     dir_dataset_len: usize,
+    //     full_dataset_len: usize,
+    // ) -> bool {
+    //     let t0 = Instant::now();
+
+    //     let cost: Dual<P, S> = dataset_cost::<true, false, PARALELIZE, _, _, _, _, _, _, _>(
+    //         dir_dataset,
+    //         dir_dataset_len,
+    //         &self.params,
+    //         &self.model_gradient,
+    //         &self.extra_data,
+    //     );
+    //     let og_parameters = array::from_fn(|i| self.params[i].get_real());
+
+    //     let fast_full_cost: f32 = dataset_cost::<false, false, PARALELIZE, _, _, _, _, _, _, _>(
+    //         full_dataset.clone(),
+    //         full_dataset_len,
+    //         &og_parameters,
+    //         &self.model,
+    //         &self.extra_data,
+    //     );
+
+    //     let raw_gradient = cost.get_gradient();
+    //     let gradient_size: f32 = raw_gradient
+    //         .iter()
+    //         .fold(0., |acc, elm| acc + (elm * elm))
+    //         .max(1e-30);
+
+    //     let unit_gradient = array::from_fn(|i| raw_gradient[i] / gradient_size.sqrt());
+
+    //     let costs = (0..6).map(|i| i as f32 / 12.).collect::<Vec<_>>();
+    //     let costs = costs
+    //         .par_iter()
+    //         .map(|factor| {
+    //             let gradient = unit_gradient.map(|e| -e * factor);
+    //             let mut trainer = self.clone();
+
+    //             let new_params = (trainer.param_translator)(&og_parameters, &gradient);
+
+    //             for (i, param) in new_params.iter().enumerate() {
+    //                 trainer.params[i].set_real(*param);
+    //             }
+
+    //             let new_cost: f32 = dataset_cost::<false, false, PARALELIZE, _, _, _, _, _, _, _>(
+    //                 full_dataset.clone(),
+    //                 full_dataset_len,
+    //                 &new_params,
+    //                 &trainer.model,
+    //                 &trainer.extra_data,
+    //             );
+
+    //             (new_params, factor, new_cost)
+    //         })
+    //         .collect::<Vec<_>>();
+
+    //     let mut running_least_cost = costs[0].2;
+    //     let mut running_best_factor_n = 0;
+
+    //     for (i, (_, f, cost)) in costs.iter().enumerate() {
+    //         println!("> cost {} at pos {} with factor {f}", cost, i);
+
+    //         if *cost < running_least_cost {
+    //             running_least_cost = *cost;
+    //             running_best_factor_n = i
+    //         }
+    //     }
+
+    //     println!(
+    //         "cost {} at pos {}",
+    //         running_least_cost, running_best_factor_n
+    //     );
+
+    //     for (i, param) in costs[running_best_factor_n].0.iter().enumerate() {
+    //         self.params[i].set_real(*param);
+    //     }
+    //     self.last_cost = Some(running_least_cost);
+
+    //     println!(
+    //         "gradient length: {gradient_size:?} - fast_full_cost: {} - new cost: {} - learning factor: {} - improvement {} - time {}",
+    //         fast_full_cost, running_least_cost, costs[running_best_factor_n].1, fast_full_cost - running_least_cost, t0.elapsed().as_secs_f32()
+    //     );
+
+    //     return true;
+    // }
 
     // TODO
 

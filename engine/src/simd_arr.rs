@@ -23,4 +23,6 @@ pub trait SimdArr<const S: usize>:
     fn acumulate(&mut self, rhs: &Self);
 
     fn multiply(&mut self, rhs: f32);
+
+    fn check_nan(&self);
 }

@@ -61,7 +61,7 @@ pub(crate) fn train_work(
             return;
         }
 
-        if !trainer.train_step::<true, _>(&pixels, pixels.len()) {
+        if !trainer.train_step_asintotic_search::<true, _, _>(&pixels, &pixels, pixels.len(), pixels.len()) {
             local_minimum_count += 1;
             trainer.shake(0.1);
         } else {

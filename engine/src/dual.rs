@@ -28,6 +28,11 @@ impl<const P: usize, S: SimdArr<P>> Dual<P, S> {
         }
     }
 
+    pub fn check_nan(&self) {
+        assert!(self.real.is_finite());
+        self.sigma.check_nan();
+    }
+
     pub(crate) fn set_real(&mut self, val: f32) {
         self.real = val
     }
@@ -94,10 +99,7 @@ impl<const P: usize, S: SimdArr<P>> From<Dual<P, S>> for f32 {
 }
 
 fn check_nan<const P: usize, S: SimdArr<P>>(d: Dual<P, S>) -> Dual<P, S> {
-    // assert!(d.get_real().is_finite());
-    // for (i,x) in d.get_gradient().into_iter().enumerate() {
-    //     assert!(x.is_finite(), "{}", i);
-    // }
+    d.check_nan();
 
     d
 }

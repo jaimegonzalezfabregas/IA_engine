@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use std::ops::Add;
 use std::ops::Mul;
 
 use ia_engine::dual::extended_arithmetic::ExtendedArithmetic;
@@ -122,7 +121,7 @@ where
         for i in 0..m {
             for j in 0..p {
                 for k in 0..n {
-                    ret.0[i][j].accumulate(self.0[i][k].clone() * rhs.0[k][j].clone())
+                    ret.0[i][j].accumulate(&(self.0[i][k].clone() * rhs.0[k][j].clone()))
                 }
             }
         }

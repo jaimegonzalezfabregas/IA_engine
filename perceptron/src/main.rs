@@ -43,17 +43,17 @@ fn main_demo() {
     let mut dataset: Vec<ia_engine::trainer::DataPoint<0, _, 10>> =
         load_data("mnist/t10k").unwrap();
 
-    let mut pixel_input = [0.; { 28 * 28 }];
+    let mut pixel_input = [0.; { 14 * 14 }];
 
     let opengl = OpenGL::V3_2;
-    let (width, height) = (280, 280);
+    let (width, height) = (140, 140);
     let mut window: PistonWindow = WindowSettings::new("piston: paint", (width, height))
         .exit_on_esc(true)
         .graphics_api(opengl)
         .build()
         .unwrap();
 
-    let mut canvas = im::ImageBuffer::new(28, 28);
+    let mut canvas = im::ImageBuffer::new(14, 14);
     let mut draw = false;
     let mut texture_context = TextureContext {
         factory: window.factory.clone(),
@@ -68,11 +68,9 @@ fn main_demo() {
 
     let mut last_pos: Option<[f64; 2]> = None;
 
-    let mut frame_n = 0;
     let mut change = false;
 
     while let Some(e) = window.next() {
-        frame_n += 1;
         if e.render_args().is_some() {
             texture.update(&mut texture_context, &canvas).unwrap();
             window.draw_2d(&e, |c, g, device| {
@@ -90,7 +88,7 @@ fn main_demo() {
             }
 
             if button == Button::Keyboard(Key::C) {
-                pixel_input = [0.; 28 * 28];
+                pixel_input = [0.; 14 * 14];
                 change = true;
             }
 
@@ -123,7 +121,7 @@ fn main_demo() {
                         let new_x = (last_x + (diff_x * delta)) as u32;
                         let new_y = (last_y + (diff_y * delta)) as u32;
                         if new_x < width && new_y < height {
-                            pixel_input[(new_x / 10 + new_y / 10 * 28) as usize] = 1.;
+                            pixel_input[(new_x / 10 + new_y / 10 * 14) as usize] = 1.;
                             change = true;
                         };
                     }
@@ -137,9 +135,9 @@ fn main_demo() {
             change = false;
             last_change_time = Some(Instant::now());
 
-            for x in 0..28 {
-                for y in 0..28 {
-                    let c = 1. - pixel_input[(x + y * 28) as usize];
+            for x in 0..14 {
+                for y in 0..14 {
+                    let c = 1. - pixel_input[(x + y * 14) as usize];
                     canvas.put_pixel(
                         x,
                         y,
@@ -177,41 +175,30 @@ fn main_demo() {
 fn train_main() {
     let mut rng = rand::thread_rng();
 
-    let mut dataset = load_data("mnist/t10k").unwrap();
+    // let mut dataset = load_data("mnist/t10k").unwrap();
+    let mut dataset = load_data("mnist/train").unwrap();
 
     let mut trainer = Trainer::new_hybrid(
-        CriticalityCue::<269322>(),
-        neuronal_network::<{ 28 * 28 }, 10, 269322, _>,
-        neuronal_network::<{ 28 * 28 }, _, _, _>,
+        CriticalityCue::<{ 6740 / 20 }>(),
+        neuronal_network::<{ 14 * 14 }, 10, 6740, _>,
+        neuronal_network::<{ 14 * 14 }, _, _, _>,
         default_param_translator,
         // param_translator_with_bounds::<_, 4, -4>,
-        vec![28 * 28, 256, 256, 10],
+        vec![14 * 14, 30, 20, 10],
     );
 
     trainer.load("model.bin").unwrap();
 
-    while trainer.train_stocastic_step::<true, _>(&dataset, 64, |i, trainer| {
-        println!("{} / {}", i * 64, dataset.len());
+    const SUBDATASET_SIZE: usize = 16 * 16 * 16;
+
+    while trainer.train_stocastic_step::<true, _>(&dataset, SUBDATASET_SIZE, |i, trainer| {
+        println!("{} / {}", i * SUBDATASET_SIZE, dataset.len());
         trainer.save("model.bin").unwrap();
-        println!("{:?}", trainer.get_last_cost());
+        // trainer.shake(0.001);
+        // println!("{:?}", trainer.get_last_cost());
     }) {
         // println!("{:?}", trainer.get_model_params());
-        println!("{:?}", trainer.get_last_cost());
+        // println!("{:?}", trainer.get_last_cost());
         dataset.shuffle(&mut rng);
     }
-
-    // for dp in dataset {
-    //     let prediction = neuronal_network::<{ 28 * 28 }, 10, _, _>(
-    //         &trainer.get_model_params(),
-    //         &dp.input,
-    //         &vec![28*28, 80, 10],
-    //     );
-
-    //     println!(
-    //         "for input: {:?} got {:?} aproximating {:?}",
-    //         dp.input,
-    //         prediction[0],
-    //         dp.output[0],
-    //     );
-    // }
 }

@@ -41,7 +41,7 @@ impl MnistData {
 
 pub fn load_data<const P: usize>(
     dataset_name: &str,
-) -> Result<Vec<DataPoint<P, { 28 * 28 }, 10>>, std::io::Error> {
+) -> Result<Vec<DataPoint<P, { 14 * 14 }, 10>>, std::io::Error> {
     let label_data = MnistData::new((File::open(format!("{}-labels-idx1-ubyte", dataset_name)))?)?;
     let images_data = MnistData::new((File::open(format!("{}-images-idx3-ubyte", dataset_name)))?)?;
     let mut images = Vec::new();
@@ -52,7 +52,22 @@ pub fn load_data<const P: usize>(
     for i in 0..images_data.sizes[0] as usize {
         let start = i * image_shape;
         let image_data = images_data.data[start..start + image_shape].to_vec();
-        let image_data: [f32; 28 * 28] = array::from_fn(|i| image_data[i] as f32 / 255.);
+
+        let mut downsampled_image_data = vec![0.; 14 * 14];
+
+        for (offset_x, offset_y) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+            for x in 0..14 {
+                for y in 0..14 {
+                    downsampled_image_data[y * 14 + x] +=
+                        image_data[(y * 2 + offset_x) * 28 + (x * 2 + offset_y)] as f32 / 255. / 4.
+                }
+            }
+        }
+
+        // println!("{:?}, {:?}", downsampled_image_data, image_data);
+
+        let image_data: [f32; 14 * 14] =
+            array::from_fn(|i| downsampled_image_data[i]);
         images.push(image_data);
     }
 

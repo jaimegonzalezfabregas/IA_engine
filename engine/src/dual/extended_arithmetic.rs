@@ -7,6 +7,8 @@ pub trait ExtendedArithmetic {
 
     fn neg(self) -> Self;
 
+    fn exp(self) -> Self;
+
     fn pow2(self) -> Self;
 
     fn abs(self) -> Self;
@@ -16,65 +18,80 @@ pub trait ExtendedArithmetic {
     fn relu(self) -> Self;
 
     fn sqrt_on_mut(&mut self);
+    fn exp_on_mut(&mut self);
     fn neg_on_mut(&mut self);
     fn pow2_on_mut(&mut self);
     fn abs_on_mut(&mut self);
     fn sigmoid_on_mut(&mut self);
     fn relu_on_mut(&mut self);
 
-    fn accumulate(&mut self, x: Self);
+    fn accumulate(&mut self, x: &Self);
 }
 
 impl<const P: usize, S: SimdArr<P>> ExtendedArithmetic for Dual<P, S> {
     fn sqrt(mut self) -> Self {
         self.sqrt_on_mut();
-        check_nan(self)
+        self
     }
 
     fn neg(mut self) -> Self {
         self.neg_on_mut();
-        check_nan(self)
+        self
+    }
+
+    fn exp(mut self) -> Self {
+        self.exp_on_mut();
+        self
     }
 
     fn pow2(mut self) -> Self {
         self.pow2_on_mut();
-        check_nan(self)
+        self
     }
 
     fn abs(mut self) -> Self {
         self.abs_on_mut();
-        check_nan(self)
+        self
     }
 
     fn relu(mut self) -> Self {
         self.relu_on_mut();
-        check_nan(self)
+        self
     }
 
     fn sigmoid(mut self) -> Self {
         self.sigmoid_on_mut();
-        check_nan(self)
+        self
     }
 
     fn sqrt_on_mut(&mut self) {
         self.real = self.real.sqrt();
         self.sigma.multiply(1. / (2. * self.real.sqrt()));
+        self.check_nan();
+    }
+
+    fn exp_on_mut(&mut self) {
+        self.real = self.real.exp();
+        self.sigma.multiply(self.real);
     }
 
     fn neg_on_mut(&mut self) {
         self.real = -self.real;
         self.sigma.multiply(-1.);
+        self.check_nan();
     }
 
     fn pow2_on_mut(&mut self) {
         self.real *= self.real;
         self.sigma.multiply(self.real * 2.);
+        self.check_nan();
     }
 
     fn abs_on_mut(&mut self) {
         if self.real < 0. {
             self.real = -self.real;
             self.sigma.neg();
+            self.check_nan();
         }
     }
 
@@ -82,18 +99,21 @@ impl<const P: usize, S: SimdArr<P>> ExtendedArithmetic for Dual<P, S> {
         self.real = self.real.sigmoid();
 
         self.sigma.multiply(self.real * (1. - self.real));
+        self.check_nan();
     }
 
     fn relu_on_mut(&mut self) {
         if self.real < 0. {
             self.real = 0.;
             self.sigma = S::zero();
+            self.check_nan();
         }
     }
 
-    fn accumulate(&mut self, x: Dual<P, S>) {
+    fn accumulate(&mut self, x: &Dual<P, S>) {
         self.real += x.real;
         self.sigma.acumulate(&x.sigma);
+        self.check_nan();
     }
 }
 
@@ -104,6 +124,10 @@ impl ExtendedArithmetic for f32 {
 
     fn neg(self) -> Self {
         -self
+    }
+
+    fn exp(self) -> Self {
+        self.exp()
     }
 
     fn pow2(self) -> Self {
@@ -131,6 +155,10 @@ impl ExtendedArithmetic for f32 {
         *self = -*self;
     }
 
+    fn exp_on_mut(&mut self) {
+        *self = self.exp()
+    }
+
     fn pow2_on_mut(&mut self) {
         *self = *self * *self;
     }
@@ -147,7 +175,7 @@ impl ExtendedArithmetic for f32 {
         *self = self.max(0.);
     }
 
-    fn accumulate(&mut self, x: f32) {
+    fn accumulate(&mut self, x: &f32) {
         *self += x;
     }
 }
