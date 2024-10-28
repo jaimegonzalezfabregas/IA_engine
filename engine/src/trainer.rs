@@ -296,7 +296,11 @@ impl<
 
     // TODO partition the dataset
 
-    pub fn train_stocastic_step<const PARALELIZE: bool, CB: Fn(usize, &mut Self)>(
+    pub fn train_stocastic_step<
+        const PARALELIZE: bool,
+        const VERBOSE: bool,
+        CB: Fn(usize, &mut Self),
+    >(
         &mut self,
         dataset: &Vec<DataPoint<P, I, O>>,
         subdataset_size: usize,
@@ -305,7 +309,7 @@ impl<
         let mut ret = false;
         for (i, sub_dataset) in dataset.chunks(subdataset_size).enumerate() {
             self.last_cost = None;
-            ret |= self.train_step_asintotic_search::<PARALELIZE, _, _>(
+            ret |= self.train_step_asintotic_search::<PARALELIZE, VERBOSE, _, _>(
                 sub_dataset,
                 dataset,
                 sub_dataset.len(),
@@ -325,6 +329,7 @@ impl<
         'a,
         'b,
         const PARALELIZE: bool,
+        const VERBOSE: bool,
         D: IntoIterator<Item = &'b DataPoint<P, I, O>>
             + IntoParallelIterator<Item = &'a DataPoint<P, I, O>>
             + Clone,
@@ -340,7 +345,7 @@ impl<
     ) -> bool {
         let t0 = Instant::now();
 
-        let cost: Dual<P, S> = dataset_cost::<true, false, PARALELIZE, _, _, _, _, _, _, _>(
+        let cost: Dual<P, S> = dataset_cost::<VERBOSE, false, PARALELIZE, _, _, _, _, _, _, _>(
             dir_dataset,
             dir_dataset_len,
             &self.params,
@@ -394,114 +399,15 @@ impl<
             }
         }
 
-        println!(
-            "gradient length: {gradient_size:?} - fast_full_cost: {} - new cost: {} - learning factor: {} - improvement {} - time {}",
-            fast_full_cost, self.last_cost.unwrap(), factor, fast_full_cost - self.last_cost.unwrap(), t0.elapsed().as_secs_f32()
-        );
+        if VERBOSE {
+            println!(
+                "gradient length: {gradient_size:?} - fast_full_cost: {} - new cost: {} - learning factor: {} - improvement {} - time {}",
+                fast_full_cost, self.last_cost.unwrap(), factor, fast_full_cost - self.last_cost.unwrap(), t0.elapsed().as_secs_f32()
+            );
+        }
 
         return true;
     }
-
-    // pub fn train_step_paralel_search<
-    //     'a,
-    //     'b,
-    //     const PARALELIZE: bool,
-    //     D: IntoIterator<Item = &'b DataPoint<P, I, O>>
-    //         + IntoParallelIterator<Item = &'a DataPoint<P, I, O>>
-    //         + Clone
-    //         + Sync,
-    //     E: IntoIterator<Item = &'b DataPoint<P, I, O>>
-    //         + IntoParallelIterator<Item = &'a DataPoint<P, I, O>>
-    //         + Clone
-    //         + Sync,
-    // >(
-    //     &mut self,
-    //     dir_dataset: D,
-    //     full_dataset: E,
-    //     dir_dataset_len: usize,
-    //     full_dataset_len: usize,
-    // ) -> bool {
-    //     let t0 = Instant::now();
-
-    //     let cost: Dual<P, S> = dataset_cost::<true, false, PARALELIZE, _, _, _, _, _, _, _>(
-    //         dir_dataset,
-    //         dir_dataset_len,
-    //         &self.params,
-    //         &self.model_gradient,
-    //         &self.extra_data,
-    //     );
-    //     let og_parameters = array::from_fn(|i| self.params[i].get_real());
-
-    //     let fast_full_cost: f32 = dataset_cost::<false, false, PARALELIZE, _, _, _, _, _, _, _>(
-    //         full_dataset.clone(),
-    //         full_dataset_len,
-    //         &og_parameters,
-    //         &self.model,
-    //         &self.extra_data,
-    //     );
-
-    //     let raw_gradient = cost.get_gradient();
-    //     let gradient_size: f32 = raw_gradient
-    //         .iter()
-    //         .fold(0., |acc, elm| acc + (elm * elm))
-    //         .max(1e-30);
-
-    //     let unit_gradient = array::from_fn(|i| raw_gradient[i] / gradient_size.sqrt());
-
-    //     let costs = (0..6).map(|i| i as f32 / 12.).collect::<Vec<_>>();
-    //     let costs = costs
-    //         .par_iter()
-    //         .map(|factor| {
-    //             let gradient = unit_gradient.map(|e| -e * factor);
-    //             let mut trainer = self.clone();
-
-    //             let new_params = (trainer.param_translator)(&og_parameters, &gradient);
-
-    //             for (i, param) in new_params.iter().enumerate() {
-    //                 trainer.params[i].set_real(*param);
-    //             }
-
-    //             let new_cost: f32 = dataset_cost::<false, false, PARALELIZE, _, _, _, _, _, _, _>(
-    //                 full_dataset.clone(),
-    //                 full_dataset_len,
-    //                 &new_params,
-    //                 &trainer.model,
-    //                 &trainer.extra_data,
-    //             );
-
-    //             (new_params, factor, new_cost)
-    //         })
-    //         .collect::<Vec<_>>();
-
-    //     let mut running_least_cost = costs[0].2;
-    //     let mut running_best_factor_n = 0;
-
-    //     for (i, (_, f, cost)) in costs.iter().enumerate() {
-    //         println!("> cost {} at pos {} with factor {f}", cost, i);
-
-    //         if *cost < running_least_cost {
-    //             running_least_cost = *cost;
-    //             running_best_factor_n = i
-    //         }
-    //     }
-
-    //     println!(
-    //         "cost {} at pos {}",
-    //         running_least_cost, running_best_factor_n
-    //     );
-
-    //     for (i, param) in costs[running_best_factor_n].0.iter().enumerate() {
-    //         self.params[i].set_real(*param);
-    //     }
-    //     self.last_cost = Some(running_least_cost);
-
-    //     println!(
-    //         "gradient length: {gradient_size:?} - fast_full_cost: {} - new cost: {} - learning factor: {} - improvement {} - time {}",
-    //         fast_full_cost, running_least_cost, costs[running_best_factor_n].1, fast_full_cost - running_least_cost, t0.elapsed().as_secs_f32()
-    //     );
-
-    //     return true;
-    // }
 
     // TODO
 

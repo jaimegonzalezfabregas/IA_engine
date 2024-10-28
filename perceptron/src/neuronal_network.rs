@@ -6,9 +6,6 @@ use ia_engine::dual::extended_arithmetic::ExtendedArithmetic;
 
 use crate::matrix::Matrix;
 
-fn relu<N: ExtendedArithmetic>(x: &mut N) {
-    x.relu_on_mut()
-}
 
 fn sigmoid<N: ExtendedArithmetic + Debug>(x: &mut N) {
     x.sigmoid_on_mut();

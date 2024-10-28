@@ -4,7 +4,7 @@ mod polinomial;
 mod piston_backend;
 
 use full_palette::GREEN_A700;
-use ia_engine::{simd_arr::dense_simd::DenseSimd, trainer::{default_param_translator, CriticalityCue, DataPoint, Trainer}};
+use ia_engine::trainer::{default_param_translator, CriticalityCue, DataPoint, Trainer};
 use piston_backend::draw_piston_window;
 use piston_window::{PistonWindow, WindowSettings};
 use plotters::prelude::*;

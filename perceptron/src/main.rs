@@ -1,5 +1,4 @@
 #![feature(generic_arg_infer)]
-#![feature(generic_const_exprs)]
 extern crate image as im;
 extern crate piston_window;
 extern crate vecmath;
